@@ -1,0 +1,4 @@
+// Hello World Example
+main () {
+  print "Hello World";
+}
