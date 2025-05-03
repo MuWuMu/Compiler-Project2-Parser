@@ -14,12 +14,21 @@ extern char *yytext;
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
+
+const char* token_names[] = {
+    "KW_BOOL", "KW_BREAK", "KW_CASE", "KW_CHAR", "KW_CONST", "KW_CONTINUE", "KW_DEFAULT", "KW_DO", "KW_DOUBLE",
+    "KW_ELSE", "KW_EXTERN", "KW_FALSE", "KW_FLOAT", "KW_FOR", "KW_FOREACH", "KW_IF", "KW_INT", "KW_MAIN",
+    "KW_PRINT", "KW_PRINTLN", "KW_READ", "KW_RETURN", "KW_STRING", "KW_SWITCH", "KW_TRUE", "KW_VOID", "KW_WHILE",
+    "ID", "INT", "REAL", "STRING", "OP", "DELIM"
+};
+
 %}
 
 // define token
-%token VOID MAIN IF ELSE WHILE PRINT RETURN
-%token ID INT REAL STRING OP DELIM
-%token KEYWORD
+%token KW_BOOL KW_BREAK KW_CASE KW_CHAR KW_CONST KW_CONTINUE KW_DEFAULT KW_DO KW_DOUBLE KW_ELSE KW_EXTERN KW_FALSE KW_FLOAT KW_FOR KW_FOREACH KW_IF KW_INT KW_MAIN KW_PRINT KW_PRINTLN KW_READ KW_RETURN KW_STRING KW_SWITCH KW_TRUE KW_VOID KW_WHILE
+%token ID INT REAL STRING
+%token OP
+%token DELIM
 
 %%
 
@@ -39,7 +48,7 @@ declaration:
     ;
 
 main_function:
-    VOID MAIN '(' ')' block
+    KW_VOID KW_MAIN '(' ')' block
     ;
 
 block:
@@ -62,12 +71,12 @@ assignment:
     ;
 
 print_statement:
-    PRINT expression ';'
+    KW_PRINT expression ';'
     ;
 
 conditional:
-    IF '(' expression ')' block
-    | IF '(' expression ')' block ELSE block
+    KW_IF '(' expression ')' block
+    | KW_IF '(' expression ')' block KW_ELSE block
     ;
 
 expression:
@@ -97,7 +106,7 @@ int main(int argc, char **argv) {
 
     int token;
     while ((token = yylex()) != 0) {
-        printf("Token: %d, Text: %s\n", token, yytext);
+        printf("Token: %s, Text: %s\n", token_names[token - 258], yytext);
     }
 
     fclose(yyin);

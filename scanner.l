@@ -80,7 +80,7 @@ void dump() {
 %option noyywrap
 %x COMMENT
 
-KEYWORD bool|break|case|char|const|continue|default|do|double|else|extern|false|float|for|foreach|if|int|print|println|read|return|string|switch|true|void|while
+KEYWORD bool|break|case|char|const|continue|default|do|double|else|extern|false|float|for|foreach|if|int|main|print|println|read|return|string|switch|true|void|while
 ID [a-zA-Z_][a-zA-Z0-9_]*
 INT [0-9]+
 REAL [-+]?([0-9]+\.[0-9]*([eE][-+]?[0-9]+)?|[0-9]+[eE][-+]?[0-9]+)
@@ -118,7 +118,35 @@ DELIM [\(\)\[\]\{\},.:;]
 {REAL}             {tokenString("REAL", yytext); return REAL;}
 {INT}              {tokenInteger("INT", yytext); return INT;}
 {STRING}           {tokenString("STRING", yytext); return STRING;}
-{KEYWORD}          {token("KEYWORD"); return KEYWORD;}
+{KEYWORD}          {token("KEYWORD"); 
+                    if (strcmp(yytext, "bool") == 0) return KW_BOOL;
+                    if (strcmp(yytext, "break") == 0) return KW_BREAK;
+                    if (strcmp(yytext, "case") == 0) return KW_CASE;
+                    if (strcmp(yytext, "char") == 0) return KW_CHAR;
+                    if (strcmp(yytext, "const") == 0) return KW_CONST;
+                    if (strcmp(yytext, "continue") == 0) return KW_CONTINUE;
+                    if (strcmp(yytext, "default") == 0) return KW_DEFAULT;
+                    if (strcmp(yytext, "do") == 0) return KW_DO;
+                    if (strcmp(yytext, "double") == 0) return KW_DOUBLE;
+                    if (strcmp(yytext, "else") == 0) return KW_ELSE;
+                    if (strcmp(yytext, "extern") == 0) return KW_EXTERN;
+                    if (strcmp(yytext, "false") == 0) return KW_FALSE;
+                    if (strcmp(yytext, "float") == 0) return KW_FLOAT;
+                    if (strcmp(yytext, "for") == 0) return KW_FOR;
+                    if (strcmp(yytext, "foreach") == 0) return KW_FOREACH;
+                    if (strcmp(yytext, "if") == 0) return KW_IF;
+                    if (strcmp(yytext, "int") == 0) return KW_INT;
+                    if (strcmp(yytext, "main") == 0) return KW_MAIN;
+                    if (strcmp(yytext, "print") == 0) return KW_PRINT;
+                    if (strcmp(yytext, "println") == 0) return KW_PRINTLN;
+                    if (strcmp(yytext, "read") == 0) return KW_READ;
+                    if (strcmp(yytext, "return") == 0) return KW_RETURN;
+                    if (strcmp(yytext, "string") == 0) return KW_STRING;
+                    if (strcmp(yytext, "switch") == 0) return KW_SWITCH;
+                    if (strcmp(yytext, "true") == 0) return KW_TRUE;
+                    if (strcmp(yytext, "void") == 0) return KW_VOID;
+                    if (strcmp(yytext, "while") == 0) return KW_WHILE;
+                    }
 {ID}               {if (lookup(yytext) == -1) insert(yytext); tokenString("ID", yytext); return ID;}
 {OP}               {tokenOp(yytext); return OP;}
 {DELIM}            {tokenDelim(yytext); return DELIM;}
