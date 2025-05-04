@@ -14,20 +14,11 @@
 #define LIST strcat(buf, yytext)
 
 // Print macros
-#ifdef DEBUG
-#define token(t) {LIST; printf("<%s>\n", t);}
+#define token(t, s) {LIST; printf("<%s: %s>\n", t, s);}
 #define tokenInteger(t, s) {LIST; printf("<%s: %s>\n", t, s);}
 #define tokenString(t, s) {LIST; printf("<%s: %s>\n", t, s);}
-// Add '' to op and delim
-#define tokenOp(d) {LIST; printf("<'%s'>\n", d);}
-#define tokenDelim(d) {LIST; printf("<'%s'>\n", d);}
-#else
-#define token(t) {}
-#define tokenInteger(t, s) {}
-#define tokenString(t, s) {}
-#define tokenOp(d) {}
-#define tokenDelim(d) {}
-#endif
+#define tokenOp(t, s) {LIST; printf("<%s: '%s'>\n", t, s);}
+#define tokenDelim(t, s) {LIST; printf("<%s: '%s'>\n", t, s);}
 
 int linenum = 1;
 char buf[MAX_LINE_LENG];
@@ -80,7 +71,7 @@ DELIM [\(\)\[\]\{\},.:;]
 {REAL}             {tokenString("REAL", yytext); return REAL;}
 {INT}              {tokenInteger("INT", yytext); return INT;}
 {STRING}           {tokenString("STRING", yytext); return STRING;}
-{KEYWORD}          {token("KEYWORD"); 
+{KEYWORD}          {token("KEYWORD", yytext); 
                     if (strcmp(yytext, "bool") == 0) return KW_BOOL;
                     if (strcmp(yytext, "break") == 0) return KW_BREAK;
                     if (strcmp(yytext, "case") == 0) return KW_CASE;
@@ -110,8 +101,35 @@ DELIM [\(\)\[\]\{\},.:;]
                     if (strcmp(yytext, "while") == 0) return KW_WHILE;
                     }
 {ID}               {tokenString("ID", yytext); return ID;}
-{OP}               {tokenOp(yytext); return OP;}
-{DELIM}            {tokenDelim(yytext); return DELIM;}
+{OP}               {tokenOp("OP", yytext);
+                    if (strcmp(yytext, "++") == 0) return OP_INC;
+                    if (strcmp(yytext, "+") == 0) return OP_ADD;
+                    if (strcmp(yytext, "--") == 0) return OP_DEC;
+                    if (strcmp(yytext, "-") == 0) return OP_SUB;
+                    if (strcmp(yytext, "*") == 0) return OP_MUL;
+                    if (strcmp(yytext, "/") == 0) return OP_DIV;
+                    if (strcmp(yytext, "%") == 0) return OP_MOD;
+                    if (strcmp(yytext, "==") == 0) return OP_EQ;
+                    if (strcmp(yytext, "!=") == 0) return OP_NEQ;
+                    if (strcmp(yytext, "<=") == 0) return OP_LEQ;
+                    if (strcmp(yytext, ">=") == 0) return OP_GEQ;
+                    if (strcmp(yytext, "=") == 0) return OP_ASSIGN;
+                    if (strcmp(yytext, "<") == 0) return OP_LT;
+                    if (strcmp(yytext, ">") == 0) return OP_GT;
+                    if (strcmp(yytext, "||") == 0) return OP_OR;
+                    if (strcmp(yytext, "&&") == 0) return OP_AND;
+                    if (strcmp(yytext, "!") == 0) return OP_NOT; }
+{DELIM}            {tokenDelim("DELIM", yytext);
+                    if (strcmp(yytext, "(") == 0) return DELIM_LPAR;
+                    if (strcmp(yytext, ")") == 0) return DELIM_RPAR;
+                    if (strcmp(yytext, "[") == 0) return DELIM_LBRACK;
+                    if (strcmp(yytext, "]") == 0) return DELIM_RBRACK;
+                    if (strcmp(yytext, "{") == 0) return DELIM_LBRACE;
+                    if (strcmp(yytext, "}") == 0) return DELIM_RBRACE;
+                    if (strcmp(yytext, ",") == 0) return DELIM_COMMA;
+                    if (strcmp(yytext, ".") == 0) return DELIM_DOT;
+                    if (strcmp(yytext, ":") == 0) return DELIM_COLON;
+                    if (strcmp(yytext, ";") == 0) return DELIM_SEMICOLON; }
 [ \t\r]+           ;    // ignore whitespace
 \n                 {linenum++;} // increment line number
 .                  {fprintf(stderr, "Unknown character: '%s'\n", yytext); exit(1);}
