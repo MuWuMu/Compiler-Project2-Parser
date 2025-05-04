@@ -29,52 +29,9 @@
 #define tokenDelim(d) {}
 #endif
 
-// Symbol Table
-char* symbolTable[HASH_SIZE];
 int linenum = 1;
 char buf[MAX_LINE_LENG];
 
-// Hash function
-unsigned int hash(char *s) {
-    unsigned int h = 0;
-    for (; *s; s++) h = (h << 4) + *s;
-    return h % HASH_SIZE;
-}
-
-void create() {
-    for (int i = 0; i < HASH_SIZE; i++) symbolTable[i] = NULL;
-}
-
-int lookup(char *s) {
-    unsigned int i = hash(s);
-    int start = i;
-    while (symbolTable[i] != NULL) {
-        if (strcmp(symbolTable[i], s) == 0) return i;
-        i = (i + 1) % HASH_SIZE;
-        if (i == start) break;
-    }
-    return -1;
-}
-
-int insert(char *s) {
-    unsigned int i = hash(s);
-    int start = i;
-    while (symbolTable[i] != NULL) {
-        if (strcmp(symbolTable[i], s) == 0) return i;
-        i = (i + 1) % HASH_SIZE;
-        if (i == start) break;
-    }
-    symbolTable[i] = strdup(s);
-    return i;
-}
-
-void dump() {
-    printf("Symbol Table:\n");
-    for (int i = 0; i < HASH_SIZE; i++) {
-        if (symbolTable[i] != NULL)
-            printf("%s\n", symbolTable[i]);
-    }
-}
 %}
 
 %option noyywrap
@@ -152,7 +109,7 @@ DELIM [\(\)\[\]\{\},.:;]
                     if (strcmp(yytext, "void") == 0) return KW_VOID;
                     if (strcmp(yytext, "while") == 0) return KW_WHILE;
                     }
-{ID}               {if (lookup(yytext) == -1) insert(yytext); tokenString("ID", yytext); return ID;}
+{ID}               {tokenString("ID", yytext); return ID;}
 {OP}               {tokenOp(yytext); return OP;}
 {DELIM}            {tokenDelim(yytext); return DELIM;}
 [ \t\r]+           ;    // ignore whitespace

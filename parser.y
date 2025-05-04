@@ -14,7 +14,7 @@ extern char *yytext;
 extern int linenum;
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Error: %s\n", s);
+    fprintf(stderr, "Error at line %d: %s\n", linenum, s);
 }
 
 const char* token_names[] = {
@@ -35,25 +35,47 @@ const char* token_names[] = {
 %%
 
 program:
-    declarations main_function
+    main_function   // min program, only one main function
+    | declarations main_function    // program with globol declarations and main function
     | error { yyerror("Syntax error in program"); }
     ;
 
-declarations:
+declarations:   // one or more declarations
     declaration declarations
     | /* empty */
     ;
 
 declaration:
-    ID ID ';'
-    | ID ID '=' expression ';'
+    type_specifier declarator_list ';'  // declaration without initialization
+    | type_specifier declarator_list_with_init ';'  // declaration with initialization
+    | KW_CONST type_specifier declarator_list_with_init ';' // constant declaration, have to be with initialization
+    ;
+
+type_specifier:
+    KW_BOOL
+    | KW_INT
+    | KW_FLOAT
+    | KW_DOUBLE
+    | KW_CHAR
+    | KW_STRING
+    ;
+
+declarator_list:
+    ID
+    | ID ',' declarator_list
+    ;
+
+declarator_list_with_init:
+    ID '=' expression
+    | ID ',' declarator_list_with_init
+    | declarator_list '=' expression
     ;
 
 main_function:
     KW_VOID KW_MAIN '(' ')' block
     ;
 
-block:
+block:  //TODO: block scope(table)
     '{' statements '}'
     ;
 
@@ -62,7 +84,7 @@ statements:
     | /* empty */
     ;
 
-statement:
+statement:  //TODO
     assignment
     | print_statement
     | conditional
@@ -106,9 +128,14 @@ int main(int argc, char **argv) {
 
     printf("Starting parsing...\n");
 
-    int token;
-    while ((token = yylex()) != 0) {
-        printf("Line%d, Token: %s, Text: %s\n", linenum, token_names[token - 258], yytext);
+    // int token;
+    // while ((token = yylex()) != 0) {
+    //     printf("Line%d, Token: %s, Text: %s\n", linenum, token_names[token - 258], yytext);
+    // }
+    if (yyparse() == 0) {
+        printf("Parsing completed successfully.\n");
+    } else {
+        printf("Parsing failed.\n");
     }
 
     fclose(yyin);
