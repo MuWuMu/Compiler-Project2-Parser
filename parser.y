@@ -11,6 +11,8 @@ extern FILE *yyin;
 // Add a global variable to store the token text
 extern char *yytext;
 
+extern int linenum;
+
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
@@ -106,7 +108,7 @@ int main(int argc, char **argv) {
 
     int token;
     while ((token = yylex()) != 0) {
-        printf("Token: %s, Text: %s\n", token_names[token - 258], yytext);
+        printf("Line%d, Token: %s, Text: %s\n", linenum, token_names[token - 258], yytext);
     }
 
     fclose(yyin);

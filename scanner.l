@@ -90,28 +90,33 @@ DELIM [\(\)\[\]\{\},.:;]
 
 %%
 "//".*"\n" {    // single line comment
-    printf("%d: %s", linenum, yytext);
+    printf("Line%d: %s", linenum, yytext);
     linenum++;
     buf[0] = '\0';
 }
 
 "/*" {      // multi line comment
     BEGIN(COMMENT);
-    LIST;
+    buf[0] = '\0'; // clear buffer
 }
+
 <COMMENT>{
     "*/" {
-        LIST;
+        if (buf[0] != '\0') {
+            printf("Line%d: %s\n", linenum, buf); // last line of comment
+        }
         BEGIN(INITIAL);
+        buf[0] = '\0';
     }
     \n {
-        LIST;
-        printf("%d: %s\n", linenum, buf);
         linenum++;
+        if (buf[0] != '\0') {
+            printf("Line%d: %s\n", linenum - 1, buf); // print comment
+        }
         buf[0] = '\0';
     }
     . {
-        LIST;
+        LIST; // add to buffer
     }
 }
 

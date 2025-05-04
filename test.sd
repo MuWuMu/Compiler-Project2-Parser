@@ -1,8 +1,15 @@
 int x = 10;
 float y = 3.14;
 string s = "Hello, World!";
+// This is a test for one-line comment
+// Trying squence one line comment
+// and another one
 void main() {
     if (x > 5) {
+        /* And this is 
+        for a block comment
+        and more lines
+        more!!*/
         print "x is greater than 5";
     } else {
         print "x is less than or equal to 5";
