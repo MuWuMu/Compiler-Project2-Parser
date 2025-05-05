@@ -31,7 +31,7 @@ void insertSymbol(SymbolTable *table, const char *name, const char *type, int is
     // set value
     if (value == NULL) {
         if (strcmp(type, "bool") == 0) {
-            symbol->value.boolValue = 0; // default value for bool
+            symbol->value.boolValue = false; // default value for bool
         } else if (strcmp(type, "int") == 0) {
             symbol->value.intValue = 0; // default value for int
         } else if (strcmp(type, "float") == 0) {
@@ -45,7 +45,7 @@ void insertSymbol(SymbolTable *table, const char *name, const char *type, int is
         }
     } else {
         if (strcmp(type, "bool") == 0) {
-            symbol->value.boolValue = *(int *)value;
+            symbol->value.boolValue = *(bool *)value;
         } else if (strcmp(type, "int") == 0) {
             symbol->value.intValue = *(int *)value;
         } else if (strcmp(type, "float") == 0) {
@@ -110,7 +110,7 @@ void dumpSymbolTable(SymbolTable *table) {
         while (symbol != NULL) {
             printf("Name: %s, Type: %s, Const: %d, Value: ", symbol->name, symbol->type, symbol->isConst);
             if (strcmp(symbol->type, "bool") == 0) {
-                printf("%d\n", symbol->value.boolValue ? "true" : "false");
+                printf("%s\n", symbol->value.boolValue ? "true" : "false");
             } else if (strcmp(symbol->type, "int") == 0) {
                 printf("%d\n", symbol->value.intValue);
             } else if (strcmp(symbol->type, "float") == 0) {
@@ -125,38 +125,4 @@ void dumpSymbolTable(SymbolTable *table) {
             symbol = symbol->next;
         }
     }
-}
-
-// Insert variables without initialization
-int insertVariables(SymbolTable *currentTable, int linenum, const char *type, Node *declaratorList, int isConst) {
-    Node *current = declaratorList;
-    int success = 1; // set if all variables can be inserted successfully
-    while (current != NULL) {
-        printf("Inserting variable: name=%s, type=%s, isConst=%d\n", current->name, type, isConst); // for debugging
-        if (lookupSymbol(currentTable, current->name)) {
-            fprintf(stderr, "Error at line %d: Duplicate declaration of variable '%s'.\n", linenum, current->name); // for debugging
-            success = 0; // failed to insert
-        } else {
-            insertSymbol(currentTable, current->name, type, isConst, NULL);
-        }
-        current = current->next;
-    }
-    return success;
-}
-
-// Insert variables with initialization
-int insertVariablesWithInit(SymbolTable *currentTable, int linenum,const char *type, Node *declaratorListWithInit, int isConst) {
-    Node *current = declaratorListWithInit;
-    int success = 1;
-    while (current != NULL) {
-        printf("Inserting variable: name=%s, type=%s, isConst=%d\n", current->name, type, isConst); // for debugging
-        if (lookupSymbol(currentTable, current->name)) {
-            fprintf(stderr, "Error at line %d: Duplicate declaration of variable '%s'.\n", linenum, current->name); // for debugging
-            success = 0;
-        } else {
-            insertSymbol(currentTable, current->name, type, isConst, current->value);
-        }
-        current = current->next;
-    }
-    return success;
 }

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define HASH_SIZE 211
 
@@ -19,7 +20,7 @@ typedef struct Symbol {
     char *type;       // id type
     int isConst;      // const or not
     union {
-        int boolValue;
+        bool boolValue;
         int intValue;
         float realValue; 
         char *stringValue;
@@ -40,9 +41,5 @@ void deleteSymbolTable(SymbolTable *table);
 void dumpSymbolTable(SymbolTable *table);
 
 unsigned int hash(const char *key);
-
-// For helping inserting variables
-int insertVariables(SymbolTable *currentTable, int linenum, const char *type, Node *declaratorList, int isConst);
-int insertVariablesWithInit(SymbolTable *currentTable, int linenum, const char *type, Node *declaratorListWithInit, int isConst);
 
 #endif

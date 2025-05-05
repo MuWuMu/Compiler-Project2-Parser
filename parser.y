@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "symbol_table.h"
 
@@ -18,13 +19,6 @@ void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
 }
 
-const char* token_names[] = {
-    "KW_BOOL", "KW_BREAK", "KW_CASE", "KW_CHAR", "KW_CONST", "KW_CONTINUE", "KW_DEFAULT", "KW_DO", "KW_DOUBLE",
-    "KW_ELSE", "KW_EXTERN", "KW_FALSE", "KW_FLOAT", "KW_FOR", "KW_FOREACH", "KW_IF", "KW_INT", "KW_MAIN",
-    "KW_PRINT", "KW_PRINTLN", "KW_READ", "KW_RETURN", "KW_STRING", "KW_SWITCH", "KW_TRUE", "KW_VOID", "KW_WHILE",
-    "ID", "INT", "REAL", "STRING", "OP", "DELIM"
-};
-
 
 %}
 
@@ -33,15 +27,17 @@ const char* token_names[] = {
     Node *node;     // For declarator_list and declarator_list_with_init
     int intval;     // For integer constants
     float realval;  // For real constants
+    bool boolval;    // For boolean constants
     char *text;     // For string constants (ID, string...)
     void *value;    // For expression (multi-type: int, float, string...)
 }
 
 // define token
-%token <string> KW_BOOL KW_BREAK KW_CASE KW_CHAR KW_CONST KW_CONTINUE KW_DEFAULT KW_DO KW_DOUBLE KW_ELSE KW_EXTERN KW_FALSE KW_FLOAT KW_FOR KW_FOREACH KW_IF KW_INT KW_MAIN KW_PRINT KW_PRINTLN KW_READ KW_RETURN KW_STRING KW_SWITCH KW_TRUE KW_VOID KW_WHILE
+%token <string> KW_BOOL KW_BREAK KW_CASE KW_CHAR KW_CONST KW_CONTINUE KW_DEFAULT KW_DO KW_DOUBLE KW_ELSE KW_EXTERN KW_FLOAT KW_FOR KW_FOREACH KW_IF KW_INT KW_MAIN KW_PRINT KW_PRINTLN KW_READ KW_RETURN KW_STRING KW_SWITCH KW_VOID KW_WHILE
 %token <text> ID
 %token <intval> INT
 %token <realval> REAL
+%token <boolval> BOOL
 %token <text> STRING
 %token <string> OP_INC OP_ADD OP_DEC OP_SUB OP_MUL OP_DIV OP_MOD OP_EQ OP_NEQ OP_LEQ OP_GEQ OP_ASSIGN OP_LT OP_GT OP_OR OP_AND OP_NOT
 %token <string> DELIM_LPAR DELIM_RPAR DELIM_LBRACK DELIM_RBRACK DELIM_LBRACE DELIM_RBRACE DELIM_COMMA DELIM_DOT DELIM_COLON DELIM_SEMICOLON
@@ -52,7 +48,7 @@ const char* token_names[] = {
 
 %%
 
-program:    //TODO: globol declaration + main_function, only one main_function
+program:
     declarations main_function
     | main_function   
     ;
@@ -109,7 +105,24 @@ declaration:
             current = current->next;
         }
     }
-    //TODO: const宣告一定要初始化
+    // single or multi const declare
+    | KW_CONST type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
+        printf("Const declaration: type=%s\n", $2);   // for debugging
+
+        Node *current = $3;
+        while (current != NULL) {
+            if (lookupSymbol(currentTable, current->name)) {
+                yyerror("Duplicate declaration of variable");
+            } else {
+                insertSymbol(currentTable, current->name, $2, 1, $5); // set as const
+                printf("Initialized const variable: %s with value\n", current->name);   // for debugging
+            }
+            current = current->next;
+        }
+    }
+    | KW_CONST type_specifier declarator_list DELIM_SEMICOLON {
+        yyerror("Const declaration must be initialized");
+    }
     //TODO: 陣列宣告
     ;
 
@@ -142,17 +155,30 @@ declarator_list:
 expression:
     INT {
         $$ = malloc(sizeof(int));
-        *(int *)$$ = $1; // store the integer value in the pointer
+        *(int *)$$ = $1;
     }
     | REAL {
         $$ = malloc(sizeof(float));
-        *(float *)$$ = $1; // real
+        *(float *)$$ = $1;
+    }
+    | BOOL {
+        $$ = malloc(sizeof(bool));
+        *(bool *)$$ = $1;
     }
     | STRING {
-        $$ = strdup($1); // string
+        $$ = strdup($1);
     }
     ;
 
+// assignments:
+//     assignment assignments
+//     | /* empty */
+//     ;
+
+// assignment: // TODO: array assignment
+//     ID OP_ASSIGN expression DELIM_SEMICOLON {   
+//     }
+//     ;
 
 
 %%

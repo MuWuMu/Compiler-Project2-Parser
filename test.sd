@@ -1,4 +1,8 @@
-string x, y, z = "hello";
-int a, b, c = 42;
-float d, e, f = 3.14;
+const int x, y;
+int z, f = 0;
+const float b = 5.3;
+bool flag = true;
+bool isReady;
+const string name = "test";
+
 void main() {}

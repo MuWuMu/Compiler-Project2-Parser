@@ -96,7 +96,7 @@ DELIM [\(\)\[\]\{\},.:;]
                     if (strcmp(yytext, "double") == 0) { yylval.string = strdup(yytext); return KW_DOUBLE; }
                     if (strcmp(yytext, "else") == 0) { yylval.string = strdup(yytext); return KW_ELSE; }
                     if (strcmp(yytext, "extern") == 0) { yylval.string = strdup(yytext); return KW_EXTERN; }
-                    if (strcmp(yytext, "false") == 0) { yylval.string = strdup(yytext); return KW_FALSE; }
+                    if (strcmp(yytext, "false") == 0) { yylval.boolval = false; return BOOL; }
                     if (strcmp(yytext, "float") == 0) { yylval.string = strdup(yytext); return KW_FLOAT; }
                     if (strcmp(yytext, "for") == 0) { yylval.string = strdup(yytext); return KW_FOR; }
                     if (strcmp(yytext, "foreach") == 0) { yylval.string = strdup(yytext); return KW_FOREACH; }
@@ -109,7 +109,7 @@ DELIM [\(\)\[\]\{\},.:;]
                     if (strcmp(yytext, "return") == 0) { yylval.string = strdup(yytext); return KW_RETURN; }
                     if (strcmp(yytext, "string") == 0) { yylval.string = strdup(yytext); return KW_STRING; }
                     if (strcmp(yytext, "switch") == 0) { yylval.string = strdup(yytext); return KW_SWITCH; }
-                    if (strcmp(yytext, "true") == 0) { yylval.string = strdup(yytext); return KW_TRUE; }
+                    if (strcmp(yytext, "true") == 0) { yylval.boolval = true; return BOOL; }
                     if (strcmp(yytext, "void") == 0) { yylval.string = strdup(yytext); return KW_VOID; }
                     if (strcmp(yytext, "while") == 0) { yylval.string = strdup(yytext); return KW_WHILE; }
                     }
