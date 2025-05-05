@@ -32,7 +32,7 @@ void yyerror(const char *s) {
     struct {
         char *type;
         void *value;
-    } expr; // For expression (multi-type: int, float, string...)
+    } expr;         // For expression (multi-type: int, float, string...)
 }
 
 // define token
@@ -48,15 +48,23 @@ void yyerror(const char *s) {
 %type <string> type_specifier
 %type <node> declarator_list
 %type <expr> expression
+%type <node> array_declaration
+%type <node> array_initializer
 
 %%
 
 program:
+    // declarations program
+    // | functions program
+    // | main_function 
+    // ;
     declarations main_function
     | main_function   
     ;
 
-main_function:  //TODO: statements between DELIM_LBRACE DELIM_RBRACE 
+main_function:
+    // KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR block
+    // ;
     KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR DELIM_LBRACE DELIM_RBRACE
     ;
 
@@ -66,19 +74,7 @@ declarations:
     ;
 
 declaration:
-    // single declaration
-    // type_specifier ID DELIM_SEMICOLON {
-    //     printf("Declaration: type=%s, name=%s\n", $1, $2);  // for debugging
-    //     // check if ID already exists in the symbol table
-    //     if (lookupSymbol(currentTable, $2)) {
-    //         yyerror("Duplicate declaration of variable");
-    //     } else {
-    //         // add ID to the symbol table
-    //         insertSymbol(currentTable, $2, $1, 0, NULL);
-    //     }
-    // }
-
-    // single or multiple declaration without initialization
+    // single or multiple declaration
     type_specifier declarator_list DELIM_SEMICOLON {
         printf("Declaration without initialization: type=%s\n", $1);    // for debugging
 
@@ -88,26 +84,11 @@ declaration:
             if (lookupSymbol(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, current->value);
+                insertSymbol(currentTable, current->name, $1, 0, current->value, 0, 0);
             }
             current = current->next;
         }
     }
-    // // single or multiple declaration with initialization
-    // | type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
-    //     printf("Declaration with initialization: type=%s\n", $1);   // for debugging
-
-    //     // traverse declarator_listlet each variable init with same value
-    //     Node *current = $2;
-    //     while (current != NULL) {
-    //         if (lookupSymbol(currentTable, current->name)) {
-    //             yyerror("Duplicate declaration of variable");
-    //         } else {
-    //             insertSymbol(currentTable, current->name, $1, 0, $4.value);
-    //         }
-    //         current = current->next;
-    //     }
-    // } 
     // single or multi const declare
     | KW_CONST type_specifier declarator_list DELIM_SEMICOLON {
         printf("Const declaration: type=%s\n", $2);   // for debugging
@@ -119,13 +100,14 @@ declaration:
             } else if (current->value == NULL) {
                 yyerror("Const variable must be initialized");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, current->value); // set as const
+                insertSymbol(currentTable, current->name, $2, 1, current->value, 0, 0); // set as const
                 printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
         }
     }
     //TODO: 陣列宣告
+    | array_declaration
     ;
 
 type_specifier:
@@ -165,6 +147,81 @@ declarator_list:
         $$->name = strdup($1);
         $$->next = $5;
         $$->value = $3.value;
+    }
+    ;
+
+array_declaration:
+    type_specifier ID DELIM_LBRACK INT DELIM_RBRACK DELIM_SEMICOLON {
+        // declare with no initialization
+        printf("Array declaration: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
+
+        if (lookupSymbol(currentTable, $2)) {
+            yyerror("Duplicate declaration of array");
+        } else {
+            // init with 0
+            void *array = calloc($4, sizeof(int));
+            insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
+        }
+    }
+    | type_specifier ID DELIM_LBRACK INT DELIM_RBRACK OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
+        // arrays with initialization values
+        printf("Array declaration with initialization: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
+
+        if (lookupSymbol(currentTable, $2)) {
+            yyerror("Duplicate declaration of array");
+        } else {
+            // 初始化陣列
+            void *array = calloc($4, sizeof(int));
+            int *arr = (int *)array;
+            int i = 0;
+            Node *init = $8;
+            while (init != NULL && i < $4) {
+                arr[i++] = *(int *)init->value;
+                init = init->next;
+            }
+            insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
+        }
+    }
+    | KW_CONST type_specifier ID DELIM_LBRACK INT DELIM_RBRACK OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
+        // const array declaration with initialization values
+        printf("Const array declaration with initialization: type=%s, name=%s, size=%d\n", $2, $3, $5); // for debugging
+
+        if (lookupSymbol(currentTable, $3)) {
+            yyerror("Duplicate declaration of array");
+        } else {
+            // init array with initialization values
+            void *array = calloc($5, sizeof(int));
+            int *arr = (int *)array;
+            int i = 0;
+            Node *init = $9;
+            while (init != NULL && i < $5) {
+                arr[i++] = *(int *)init->value;
+                init = init->next;
+            }
+            insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            printf("Declared const array: %s, size=%d\n", $3, $5); // for debugging
+        }
+    }
+    | KW_CONST type_specifier ID DELIM_LBRACK INT DELIM_RBRACK DELIM_SEMICOLON {
+        // const array declaration without initialization (invalid)
+        yyerror("Const array must be initialized");
+    }
+    ;
+
+array_initializer:
+    expression {
+        // single initialization value
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->value = $1.value;
+        $$->next = NULL;
+    }
+    | expression DELIM_COMMA array_initializer {
+        // multi initialization values
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->value = $1.value;
+        $$->next = $3;
     }
     ;
 

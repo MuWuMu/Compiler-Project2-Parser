@@ -19,11 +19,14 @@ typedef struct Symbol {
     char *name;       // id name
     char *type;       // id type
     int isConst;      // const or not
+    int isArray;     // array or not
+    int arraySize;    // size of array if isArray is true
     union {
         bool boolValue;
         int intValue;
         float realValue; 
         char *stringValue;
+        void *arrayValue;
     } value;             // value of the symbol
     struct Symbol *next; 
 } Symbol;
@@ -35,7 +38,7 @@ typedef struct SymbolTable {
 } SymbolTable;
 
 SymbolTable* createSymbolTable(SymbolTable *parent);
-void insertSymbol(SymbolTable *table, const char *name, const char *type, int isConst, void *value);
+void insertSymbol(SymbolTable *table, const char *name, const char *type, int isConst, void *value, int isArray, int arraySize);
 Symbol* lookupSymbol(SymbolTable *table, const char *name);
 void deleteSymbolTable(SymbolTable *table);
 void dumpSymbolTable(SymbolTable *table);
