@@ -1,1 +1,4 @@
+string x, y, z = "hello";
+int a, b, c = 42;
+float d, e, f = 3.14;
 void main() {}

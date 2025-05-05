@@ -1,12 +1,13 @@
 LEX = lex.yy.c
 YACC_C = y.tab.c
 YACC_H = y.tab.h
+SYMBOL_TABLE = symbol_table.c
 EXEC = parser
 
 all: $(EXEC)
 
-$(EXEC): $(LEX) $(YACC_C)
-	gcc $(LEX) $(YACC_C) -o $(EXEC)
+$(EXEC): $(LEX) $(YACC_C) $(SYMBOL_TABLE)
+	gcc $(LEX) $(YACC_C) $(SYMBOL_TABLE) -o $(EXEC)
 
 $(LEX): scanner.l
 	lex scanner.l

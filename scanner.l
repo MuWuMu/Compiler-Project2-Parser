@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "symbol_table.h"
 #include "y.tab.h" // for token return by yacc
 
 #define MAX_LINE_LENG 256
@@ -14,11 +15,11 @@
 #define LIST strcat(buf, yytext)
 
 // Print macros
-#define token(t, s) {LIST; printf("<%s: %s>\n", t, s);}
-#define tokenInteger(t, s) {LIST; printf("<%s: %s>\n", t, s);}
-#define tokenString(t, s) {LIST; printf("<%s: %s>\n", t, s);}
-#define tokenOp(t, s) {LIST; printf("<%s: '%s'>\n", t, s);}
-#define tokenDelim(t, s) {LIST; printf("<%s: '%s'>\n", t, s);}
+#define token(t, s) {LIST; /*printf("<%s: %s>\n", t, s);*/}
+#define tokenInteger(t, s) {LIST; /*printf("<%s: %s>\n", t, s);*/}
+#define tokenString(t, s) {LIST; /*printf("<%s: %s>\n", t, s);*/}
+#define tokenOp(t, s) {LIST; /*printf("<%s: '%s'>\n", t, s);*/}
+#define tokenDelim(t, s) {LIST; /*printf("<%s: '%s'>\n", t, s);*/}
 
 int linenum = 1;
 char buf[MAX_LINE_LENG];
@@ -68,68 +69,88 @@ DELIM [\(\)\[\]\{\},.:;]
     }
 }
 
-{REAL}             {tokenString("REAL", yytext); return REAL;}
-{INT}              {tokenInteger("INT", yytext); return INT;}
-{STRING}           {tokenString("STRING", yytext); return STRING;}
-{KEYWORD}          {token("KEYWORD", yytext); 
-                    if (strcmp(yytext, "bool") == 0) return KW_BOOL;
-                    if (strcmp(yytext, "break") == 0) return KW_BREAK;
-                    if (strcmp(yytext, "case") == 0) return KW_CASE;
-                    if (strcmp(yytext, "char") == 0) return KW_CHAR;
-                    if (strcmp(yytext, "const") == 0) return KW_CONST;
-                    if (strcmp(yytext, "continue") == 0) return KW_CONTINUE;
-                    if (strcmp(yytext, "default") == 0) return KW_DEFAULT;
-                    if (strcmp(yytext, "do") == 0) return KW_DO;
-                    if (strcmp(yytext, "double") == 0) return KW_DOUBLE;
-                    if (strcmp(yytext, "else") == 0) return KW_ELSE;
-                    if (strcmp(yytext, "extern") == 0) return KW_EXTERN;
-                    if (strcmp(yytext, "false") == 0) return KW_FALSE;
-                    if (strcmp(yytext, "float") == 0) return KW_FLOAT;
-                    if (strcmp(yytext, "for") == 0) return KW_FOR;
-                    if (strcmp(yytext, "foreach") == 0) return KW_FOREACH;
-                    if (strcmp(yytext, "if") == 0) return KW_IF;
-                    if (strcmp(yytext, "int") == 0) return KW_INT;
-                    if (strcmp(yytext, "main") == 0) return KW_MAIN;
-                    if (strcmp(yytext, "print") == 0) return KW_PRINT;
-                    if (strcmp(yytext, "println") == 0) return KW_PRINTLN;
-                    if (strcmp(yytext, "read") == 0) return KW_READ;
-                    if (strcmp(yytext, "return") == 0) return KW_RETURN;
-                    if (strcmp(yytext, "string") == 0) return KW_STRING;
-                    if (strcmp(yytext, "switch") == 0) return KW_SWITCH;
-                    if (strcmp(yytext, "true") == 0) return KW_TRUE;
-                    if (strcmp(yytext, "void") == 0) return KW_VOID;
-                    if (strcmp(yytext, "while") == 0) return KW_WHILE;
+{REAL}             {    //TODO: deal with exponent and sign
+                    tokenString("REAL", yytext);
+                    yylval.realval = atof(yytext);
+                    return REAL;
                     }
-{ID}               {tokenString("ID", yytext); return ID;}
-{OP}               {tokenOp("OP", yytext);
-                    if (strcmp(yytext, "++") == 0) return OP_INC;
-                    if (strcmp(yytext, "+") == 0) return OP_ADD;
-                    if (strcmp(yytext, "--") == 0) return OP_DEC;
-                    if (strcmp(yytext, "-") == 0) return OP_SUB;
-                    if (strcmp(yytext, "*") == 0) return OP_MUL;
-                    if (strcmp(yytext, "/") == 0) return OP_DIV;
-                    if (strcmp(yytext, "%") == 0) return OP_MOD;
-                    if (strcmp(yytext, "==") == 0) return OP_EQ;
-                    if (strcmp(yytext, "!=") == 0) return OP_NEQ;
-                    if (strcmp(yytext, "<=") == 0) return OP_LEQ;
-                    if (strcmp(yytext, ">=") == 0) return OP_GEQ;
-                    if (strcmp(yytext, "=") == 0) return OP_ASSIGN;
-                    if (strcmp(yytext, "<") == 0) return OP_LT;
-                    if (strcmp(yytext, ">") == 0) return OP_GT;
-                    if (strcmp(yytext, "||") == 0) return OP_OR;
-                    if (strcmp(yytext, "&&") == 0) return OP_AND;
-                    if (strcmp(yytext, "!") == 0) return OP_NOT; }
-{DELIM}            {tokenDelim("DELIM", yytext);
-                    if (strcmp(yytext, "(") == 0) return DELIM_LPAR;
-                    if (strcmp(yytext, ")") == 0) return DELIM_RPAR;
-                    if (strcmp(yytext, "[") == 0) return DELIM_LBRACK;
-                    if (strcmp(yytext, "]") == 0) return DELIM_RBRACK;
-                    if (strcmp(yytext, "{") == 0) return DELIM_LBRACE;
-                    if (strcmp(yytext, "}") == 0) return DELIM_RBRACE;
-                    if (strcmp(yytext, ",") == 0) return DELIM_COMMA;
-                    if (strcmp(yytext, ".") == 0) return DELIM_DOT;
-                    if (strcmp(yytext, ":") == 0) return DELIM_COLON;
-                    if (strcmp(yytext, ";") == 0) return DELIM_SEMICOLON; }
+{INT}              {
+                    tokenInteger("INT", yytext);
+                    yylval.intval = atoi(yytext);
+                    return INT;
+                    }
+{STRING}           {
+                    tokenString("STRING", yytext);
+                    yylval.text = strdup(yytext);
+                    return STRING;
+                    }
+{KEYWORD}          {token("KEYWORD", yytext); 
+                    if (strcmp(yytext, "bool") == 0) { yylval.string = strdup(yytext); return KW_BOOL; }
+                    if (strcmp(yytext, "break") == 0) { yylval.string = strdup(yytext); return KW_BREAK; }
+                    if (strcmp(yytext, "case") == 0) { yylval.string = strdup(yytext); return KW_CASE; }
+                    if (strcmp(yytext, "char") == 0) { yylval.string = strdup(yytext); return KW_CHAR; }
+                    if (strcmp(yytext, "const") == 0) { yylval.string = strdup(yytext); return KW_CONST; }
+                    if (strcmp(yytext, "continue") == 0) { yylval.string = strdup(yytext); return KW_CONTINUE; }
+                    if (strcmp(yytext, "default") == 0) { yylval.string = strdup(yytext); return KW_DEFAULT; }
+                    if (strcmp(yytext, "do") == 0) { yylval.string = strdup(yytext); return KW_DO; }
+                    if (strcmp(yytext, "double") == 0) { yylval.string = strdup(yytext); return KW_DOUBLE; }
+                    if (strcmp(yytext, "else") == 0) { yylval.string = strdup(yytext); return KW_ELSE; }
+                    if (strcmp(yytext, "extern") == 0) { yylval.string = strdup(yytext); return KW_EXTERN; }
+                    if (strcmp(yytext, "false") == 0) { yylval.string = strdup(yytext); return KW_FALSE; }
+                    if (strcmp(yytext, "float") == 0) { yylval.string = strdup(yytext); return KW_FLOAT; }
+                    if (strcmp(yytext, "for") == 0) { yylval.string = strdup(yytext); return KW_FOR; }
+                    if (strcmp(yytext, "foreach") == 0) { yylval.string = strdup(yytext); return KW_FOREACH; }
+                    if (strcmp(yytext, "if") == 0) { yylval.string = strdup(yytext); return KW_IF; }
+                    if (strcmp(yytext, "int") == 0) { yylval.string = strdup(yytext); return KW_INT; }
+                    if (strcmp(yytext, "main") == 0) { yylval.string = strdup(yytext); return KW_MAIN; }
+                    if (strcmp(yytext, "print") == 0) { yylval.string = strdup(yytext); return KW_PRINT; }
+                    if (strcmp(yytext, "println") == 0) { yylval.string = strdup(yytext); return KW_PRINTLN; }
+                    if (strcmp(yytext, "read") == 0) { yylval.string = strdup(yytext); return KW_READ; }
+                    if (strcmp(yytext, "return") == 0) { yylval.string = strdup(yytext); return KW_RETURN; }
+                    if (strcmp(yytext, "string") == 0) { yylval.string = strdup(yytext); return KW_STRING; }
+                    if (strcmp(yytext, "switch") == 0) { yylval.string = strdup(yytext); return KW_SWITCH; }
+                    if (strcmp(yytext, "true") == 0) { yylval.string = strdup(yytext); return KW_TRUE; }
+                    if (strcmp(yytext, "void") == 0) { yylval.string = strdup(yytext); return KW_VOID; }
+                    if (strcmp(yytext, "while") == 0) { yylval.string = strdup(yytext); return KW_WHILE; }
+                    }
+{ID}               {
+                    tokenString("ID", yytext); 
+                    yylval.text = strdup(yytext);
+                    return ID;
+                    }
+{OP}               {
+                    tokenOp("OP", yytext);
+                    if (strcmp(yytext, "++") == 0) { yylval.string = strdup(yytext); return OP_INC; }
+                    if (strcmp(yytext, "+") == 0) { yylval.string = strdup(yytext); return OP_ADD; }
+                    if (strcmp(yytext, "--") == 0) { yylval.string = strdup(yytext); return OP_DEC; }
+                    if (strcmp(yytext, "-") == 0) { yylval.string = strdup(yytext); return OP_SUB; }
+                    if (strcmp(yytext, "*") == 0) { yylval.string = strdup(yytext); return OP_MUL; }
+                    if (strcmp(yytext, "/") == 0) { yylval.string = strdup(yytext); return OP_DIV; }
+                    if (strcmp(yytext, "%") == 0) { yylval.string = strdup(yytext); return OP_MOD; }
+                    if (strcmp(yytext, "==") == 0) { yylval.string = strdup(yytext); return OP_EQ; }
+                    if (strcmp(yytext, "!=") == 0) { yylval.string = strdup(yytext); return OP_NEQ; }
+                    if (strcmp(yytext, "<=") == 0) { yylval.string = strdup(yytext); return OP_LEQ; }
+                    if (strcmp(yytext, ">=") == 0) { yylval.string = strdup(yytext); return OP_GEQ; }
+                    if (strcmp(yytext, "=") == 0) { yylval.string = strdup(yytext); return OP_ASSIGN; }
+                    if (strcmp(yytext, "<") == 0) { yylval.string = strdup(yytext); return OP_LT; }
+                    if (strcmp(yytext, ">") == 0) { yylval.string = strdup(yytext); return OP_GT; }
+                    if (strcmp(yytext, "||") == 0) { yylval.string = strdup(yytext); return OP_OR; }
+                    if (strcmp(yytext, "&&") == 0) { yylval.string = strdup(yytext); return OP_AND; }
+                    if (strcmp(yytext, "!") == 0) { yylval.string = strdup(yytext); return OP_NOT; }
+                    }
+{DELIM}            {
+                    tokenDelim("DELIM", yytext);
+                    if (strcmp(yytext, "(") == 0) { yylval.string = strdup(yytext); return DELIM_LPAR; }
+                    if (strcmp(yytext, ")") == 0) { yylval.string = strdup(yytext); return DELIM_RPAR; }
+                    if (strcmp(yytext, "[") == 0) { yylval.string = strdup(yytext); return DELIM_LBRACK; }
+                    if (strcmp(yytext, "]") == 0) { yylval.string = strdup(yytext); return DELIM_RBRACK; }
+                    if (strcmp(yytext, "{") == 0) { yylval.string = strdup(yytext); return DELIM_LBRACE; }
+                    if (strcmp(yytext, "}") == 0) { yylval.string = strdup(yytext); return DELIM_RBRACE; }
+                    if (strcmp(yytext, ",") == 0) { yylval.string = strdup(yytext); return DELIM_COMMA; }
+                    if (strcmp(yytext, ".") == 0) { yylval.string = strdup(yytext); return DELIM_DOT; }
+                    if (strcmp(yytext, ":") == 0) { yylval.string = strdup(yytext); return DELIM_COLON; }
+                    if (strcmp(yytext, ";") == 0) { yylval.string = strdup(yytext); return DELIM_SEMICOLON; }
+                    }
 [ \t\r]+           ;    // ignore whitespace
 \n                 {linenum++;} // increment line number
 .                  {fprintf(stderr, "Unknown character: '%s'\n", yytext); exit(1);}

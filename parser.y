@@ -3,15 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "symbol_table.h"
+
 // get token that recognized by scanner
 extern int yylex();
 extern int yyparse();
 extern FILE *yyin;
-
-// Add a global variable to store the token text
 extern char *yytext;
-
 extern int linenum;
+
+SymbolTable *currentTable = NULL;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
@@ -24,113 +25,135 @@ const char* token_names[] = {
     "ID", "INT", "REAL", "STRING", "OP", "DELIM"
 };
 
+
 %}
 
+%union {
+    char *string;   // For type_specifier (int, float...)
+    Node *node;     // For declarator_list and declarator_list_with_init
+    int intval;     // For integer constants
+    float realval;  // For real constants
+    char *text;     // For string constants (ID, string...)
+    void *value;    // For expression (multi-type: int, float, string...)
+}
+
 // define token
-%token KW_BOOL KW_BREAK KW_CASE KW_CHAR KW_CONST KW_CONTINUE KW_DEFAULT KW_DO KW_DOUBLE KW_ELSE KW_EXTERN KW_FALSE KW_FLOAT KW_FOR KW_FOREACH KW_IF KW_INT KW_MAIN KW_PRINT KW_PRINTLN KW_READ KW_RETURN KW_STRING KW_SWITCH KW_TRUE KW_VOID KW_WHILE
-%token ID INT REAL STRING
-%token OP_INC OP_ADD OP_DEC OP_SUB OP_MUL OP_DIV OP_MOD OP_EQ OP_NEQ OP_LEQ OP_GEQ OP_ASSIGN OP_LT OP_GT OP_OR OP_AND OP_NOT
-%token DELIM_LPAR DELIM_RPAR DELIM_LBRACK DELIM_RBRACK DELIM_LBRACE DELIM_RBRACE DELIM_COMMA DELIM_DOT DELIM_COLON DELIM_SEMICOLON
+%token <string> KW_BOOL KW_BREAK KW_CASE KW_CHAR KW_CONST KW_CONTINUE KW_DEFAULT KW_DO KW_DOUBLE KW_ELSE KW_EXTERN KW_FALSE KW_FLOAT KW_FOR KW_FOREACH KW_IF KW_INT KW_MAIN KW_PRINT KW_PRINTLN KW_READ KW_RETURN KW_STRING KW_SWITCH KW_TRUE KW_VOID KW_WHILE
+%token <text> ID
+%token <intval> INT
+%token <realval> REAL
+%token <text> STRING
+%token <string> OP_INC OP_ADD OP_DEC OP_SUB OP_MUL OP_DIV OP_MOD OP_EQ OP_NEQ OP_LEQ OP_GEQ OP_ASSIGN OP_LT OP_GT OP_OR OP_AND OP_NOT
+%token <string> DELIM_LPAR DELIM_RPAR DELIM_LBRACK DELIM_RBRACK DELIM_LBRACE DELIM_RBRACE DELIM_COMMA DELIM_DOT DELIM_COLON DELIM_SEMICOLON
+
+%type <string> type_specifier
+%type <node> declarator_list
+%type <value> expression
 
 %%
 
-program:
-    main_function   // min program, only one main function
-    | declarations main_function    // program with globol declarations and main function
-    | error { yyerror("Syntax error in program"); }
+program:    //TODO: globol declaration + main_function, only one main_function
+    declarations main_function
+    | main_function   
     ;
 
-declarations:   // one or more declarations
+main_function:  //TODO: statements between DELIM_LBRACE DELIM_RBRACE 
+    KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR DELIM_LBRACE DELIM_RBRACE
+    ;
+
+declarations:
     declaration declarations
     | /* empty */
     ;
 
 declaration:
-    type_specifier declarator_list DELIM_SEMICOLON  // declaration without initialization
-    | type_specifier declarator_list_with_init DELIM_SEMICOLON  // declaration with initialization
-    | KW_CONST type_specifier declarator_list_with_init DELIM_SEMICOLON // constant declaration, have to be with initialization
+    // single declaration
+    // type_specifier ID DELIM_SEMICOLON {
+    //     printf("Declaration: type=%s, name=%s\n", $1, $2);  // for debugging
+    //     // check if ID already exists in the symbol table
+    //     if (lookupSymbol(currentTable, $2)) {
+    //         yyerror("Duplicate declaration of variable");
+    //     } else {
+    //         // add ID to the symbol table
+    //         insertSymbol(currentTable, $2, $1, 0, NULL);
+    //     }
+    // }
+
+    // single or multiple declaration without initialization
+    type_specifier declarator_list DELIM_SEMICOLON {
+        printf("Declaration without initialization: type=%s\n", $1);    // for debugging
+
+        // traverse declarator_list，insert each one into symbol table
+        Node *current = $2;
+        while (current != NULL) {
+            if (lookupSymbol(currentTable, current->name)) {
+                yyerror("Duplicate declaration of variable");
+            } else {
+                insertSymbol(currentTable, current->name, $1, 0, NULL);
+            }
+            current = current->next;
+        }
+    }
+    // single or multiple declaration with initialization
+    | type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
+        printf("Declaration with initialization: type=%s\n", $1);   // for debugging
+
+        // traverse declarator_listlet each variable init with same value
+        Node *current = $2;
+        while (current != NULL) {
+            if (lookupSymbol(currentTable, current->name)) {
+                yyerror("Duplicate declaration of variable");
+            } else {
+                insertSymbol(currentTable, current->name, $1, 0, $4);
+            }
+            current = current->next;
+        }
+    }
+    //TODO: const宣告一定要初始化
+    //TODO: 陣列宣告
     ;
 
 type_specifier:
-    KW_BOOL
-    | KW_INT
-    | KW_FLOAT
-    | KW_DOUBLE
-    | KW_CHAR
-    | KW_STRING
+    KW_INT { $$ = "int";}
+    | KW_FLOAT { $$ = "float";}
+    | KW_DOUBLE { $$ = "double";}
+    | KW_CHAR { $$ = "char";}
+    | KW_BOOL { $$ = "bool";}
+    | KW_STRING { $$ = "string";}
     ;
 
 declarator_list:
-    ID
-    | ID DELIM_COMMA declarator_list
-    ;
-
-declarator_list_with_init:
-    ID OP_ASSIGN expression
-    | ID DELIM_COMMA declarator_list_with_init
-    | declarator_list DELIM_COMMA expression
-    ;
-
-main_function:
-    KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR block
-    ;
-
-block:  //TODO: block scope(table)
-    DELIM_LBRACE statements DELIM_RBRACE
-    ;
-
-statements:
-    statement statements
-    | /* empty */
-    ;
-
-statement:  //TODO: more statement types
-    assignment
-    | print_statement
-    | conditional
-    ;
-
-assignment: //TODO: void const assignment
-    ID OP_ASSIGN expression DELIM_SEMICOLON
-    ;
-
-print_statement:
-    KW_PRINT expression DELIM_SEMICOLON
-    ;
-
-conditional:
-    KW_IF DELIM_LPAR expression DELIM_RPAR block
-    | KW_IF DELIM_LPAR expression DELIM_RPAR block KW_ELSE block
+    ID {
+        // single declaration no initialization
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->name = strdup($1);
+        $$->next = NULL;
+        $$->value = NULL; // no initialization
+    }
+    | ID DELIM_COMMA declarator_list {
+        // multi declaration without initialization
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->name = strdup($1);
+        $$->next = $3;
+        $$->value = NULL;
+    }
     ;
 
 expression:
-    INT
-    | REAL
-    | STRING
-    | ID
-    | DELIM_LPAR expression DELIM_RPAR
-    | expression operators expression
+    INT {
+        $$ = malloc(sizeof(int));
+        *(int *)$$ = $1; // store the integer value in the pointer
+    }
+    | REAL {
+        $$ = malloc(sizeof(float));
+        *(float *)$$ = $1; // real
+    }
+    | STRING {
+        $$ = strdup($1); // string
+    }
     ;
-    
-operators:
-    OP_INC
-    | OP_ADD
-    | OP_DEC
-    | OP_SUB
-    | OP_MUL
-    | OP_DIV
-    | OP_MOD
-    | OP_EQ
-    | OP_NEQ
-    | OP_LEQ
-    | OP_GEQ
-    | OP_ASSIGN
-    | OP_LT
-    | OP_GT
-    | OP_OR
-    | OP_AND
-    | OP_NOT
-    ;
+
+
 
 %%
 
@@ -148,11 +171,19 @@ int main(int argc, char **argv) {
 
     printf("Starting parsing...\n");
 
+    // Initialize the symbol table
+    currentTable = createSymbolTable(NULL);
+
     // int token;
     // while ((token = yylex()) != 0) {
     //     printf("Line%d, Token: %s, Text: %s\n", linenum, token_names[token - 258], yytext);
     // }
+
     if (yyparse() == 0) {
+        // Dump and delete globol symbol table
+        dumpSymbolTable(currentTable);
+        deleteSymbolTable(currentTable);
+        currentTable = NULL;
         printf("Parsing completed successfully.\n");
     } else {
         printf("Parsing failed.\n");
