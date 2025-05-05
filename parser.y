@@ -29,7 +29,10 @@ void yyerror(const char *s) {
     float realval;  // For real constants
     bool boolval;    // For boolean constants
     char *text;     // For string constants (ID, string...)
-    void *value;    // For expression (multi-type: int, float, string...)
+    struct {
+        char *type;
+        void *value;
+    } expr; // For expression (multi-type: int, float, string...)
 }
 
 // define token
@@ -44,12 +47,12 @@ void yyerror(const char *s) {
 
 %type <string> type_specifier
 %type <node> declarator_list
-%type <value> expression
+%type <expr> expression
 
 %%
 
 program:
-    declarations main_function
+    declarations assignments main_function
     | main_function   
     ;
 
@@ -100,7 +103,7 @@ declaration:
             if (lookupSymbol(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, $4);
+                insertSymbol(currentTable, current->name, $1, 0, $4.value);
             }
             current = current->next;
         }
@@ -114,7 +117,7 @@ declaration:
             if (lookupSymbol(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, $5); // set as const
+                insertSymbol(currentTable, current->name, $2, 1, $5.value); // set as const
                 printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
@@ -154,31 +157,64 @@ declarator_list:
 
 expression:
     INT {
-        $$ = malloc(sizeof(int));
-        *(int *)$$ = $1;
+        $$.type = "INT";
+        $$.value = malloc(sizeof(int));
+        *(int *)$$.value = $1;
+        printf("Expression type: INT, value: %d\n", $1); // for debugging
     }
     | REAL {
-        $$ = malloc(sizeof(float));
-        *(float *)$$ = $1;
+        $$.type = "REAL";
+        $$.value = malloc(sizeof(float));
+        *(float *)$$.value = $1;
+        printf("Expression type: REAL, value: %f\n", $1); // for debugging
     }
     | BOOL {
-        $$ = malloc(sizeof(bool));
-        *(bool *)$$ = $1;
+        $$.type = "BOOL";
+        $$.value = malloc(sizeof(bool));
+        *(bool *)$$.value = $1;
+        printf("Expression type: BOOL, value: %s\n", $1 ? "true" : "false"); // for debugging
     }
     | STRING {
-        $$ = strdup($1);
+        $$.type = "STRING";
+        $$.value = strdup($1);
+        printf("Expression type: STRING, value: %s\n", $1); // for debugging
     }
     ;
 
-// assignments:
-//     assignment assignments
-//     | /* empty */
-//     ;
+assignments:
+    assignment assignments
+    | /* empty */
+    ;
 
-// assignment: // TODO: array assignment
-//     ID OP_ASSIGN expression DELIM_SEMICOLON {   
-//     }
-//     ;
+assignment: // TODO: array assignment
+    ID OP_ASSIGN expression DELIM_SEMICOLON {   
+        Symbol *symbol = lookupSymbol(currentTable, $1);
+        if (!symbol) {
+            yyerror("Variable not declared");
+        } else if (symbol->isConst) {
+            yyerror("Cannot assign to a constant variable");
+        } else {
+            // check if the type of the variable matches the type of the expression
+            if (strcmp(symbol->type, "int") == 0 && strcmp($3.type, "INT") == 0) {
+                // int to int assignment
+                symbol->value.intValue = *(int *)$3.value;
+            } else if ((strcmp(symbol->type, "float") == 0) || (strcmp(symbol->type, "double") == 0) && strcmp($3.type, "REAL") == 0) {
+                // float to float assignment
+                symbol->value.realValue = *(float *)$3.value;
+            } else if (strcmp(symbol->type, "bool") == 0 && strcmp($3.type, "BOOL") == 0) {
+                // bool to bool assignment
+                symbol->value.boolValue = *(bool *)$3.value;
+            } else if ((strcmp(symbol->type, "char") == 0) || (strcmp(symbol->type, "string") == 0) && strcmp($3.type, "STRING") == 0) {
+                // string to string assignment
+                free(symbol->value.stringValue); // free old value
+                symbol->value.stringValue = strdup((char *)$3.value);
+            } else {
+                yyerror("Type mismatch in assignment");
+        }
+        free($3.value); // 釋放 expression 的值
+        }
+    }
+    ;
 
 
 %%

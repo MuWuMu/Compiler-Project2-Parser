@@ -5,4 +5,9 @@ bool flag = true;
 bool isReady;
 const string name = "test";
 
+z = 10;
+flag = false;
+b = 3.14;
+
+
 void main() {}
