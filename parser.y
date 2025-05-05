@@ -52,7 +52,7 @@ void yyerror(const char *s) {
 %%
 
 program:
-    declarations assignments main_function
+    declarations main_function
     | main_function   
     ;
 
@@ -88,43 +88,42 @@ declaration:
             if (lookupSymbol(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, NULL);
+                insertSymbol(currentTable, current->name, $1, 0, current->value);
             }
             current = current->next;
         }
     }
-    // single or multiple declaration with initialization
-    | type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
-        printf("Declaration with initialization: type=%s\n", $1);   // for debugging
+    // // single or multiple declaration with initialization
+    // | type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
+    //     printf("Declaration with initialization: type=%s\n", $1);   // for debugging
 
-        // traverse declarator_listlet each variable init with same value
-        Node *current = $2;
-        while (current != NULL) {
-            if (lookupSymbol(currentTable, current->name)) {
-                yyerror("Duplicate declaration of variable");
-            } else {
-                insertSymbol(currentTable, current->name, $1, 0, $4.value);
-            }
-            current = current->next;
-        }
-    }
+    //     // traverse declarator_listlet each variable init with same value
+    //     Node *current = $2;
+    //     while (current != NULL) {
+    //         if (lookupSymbol(currentTable, current->name)) {
+    //             yyerror("Duplicate declaration of variable");
+    //         } else {
+    //             insertSymbol(currentTable, current->name, $1, 0, $4.value);
+    //         }
+    //         current = current->next;
+    //     }
+    // } 
     // single or multi const declare
-    | KW_CONST type_specifier declarator_list OP_ASSIGN expression DELIM_SEMICOLON {
+    | KW_CONST type_specifier declarator_list DELIM_SEMICOLON {
         printf("Const declaration: type=%s\n", $2);   // for debugging
 
         Node *current = $3;
         while (current != NULL) {
             if (lookupSymbol(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
+            } else if (current->value == NULL) {
+                yyerror("Const variable must be initialized");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, $5.value); // set as const
+                insertSymbol(currentTable, current->name, $2, 1, current->value); // set as const
                 printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
         }
-    }
-    | KW_CONST type_specifier declarator_list DELIM_SEMICOLON {
-        yyerror("Const declaration must be initialized");
     }
     //TODO: 陣列宣告
     ;
@@ -140,11 +139,18 @@ type_specifier:
 
 declarator_list:
     ID {
-        // single declaration no initialization
+        // single declaration without initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
         $$->next = NULL;
         $$->value = NULL; // no initialization
+    }
+    | ID OP_ASSIGN expression {
+        // single declaration with initialization
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->name = strdup($1);
+        $$->next = NULL;
+        $$->value = $3.value; // initialization value
     }
     | ID DELIM_COMMA declarator_list {
         // multi declaration without initialization
@@ -152,6 +158,13 @@ declarator_list:
         $$->name = strdup($1);
         $$->next = $3;
         $$->value = NULL;
+    }
+    | ID OP_ASSIGN expression DELIM_COMMA declarator_list {
+        // multi declaration with initialization
+        $$ = (Node *)malloc(sizeof(Node));
+        $$->name = strdup($1);
+        $$->next = $5;
+        $$->value = $3.value;
     }
     ;
 

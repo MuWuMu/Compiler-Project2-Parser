@@ -1,13 +1,7 @@
-const int x, y;
-int z, f = 0;
-const float b = 5.3;
-bool flag = true;
-bool isReady;
-const string name = "test";
-
-z = 10;
-flag = false;
-b = 3.14;
+const int a = 1;
+const int b = 2, c = 3;
+const int d, e = 2;
+const int f, g = 3, h;
 
 
 void main() {}
