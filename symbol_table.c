@@ -123,8 +123,8 @@ void dumpSymbolTable(SymbolTable *table) {
                     if (j < symbol->arraySize - 1) {
                         printf(", ");
                     }
-                 }
-                 printf("}\n");
+                }
+                printf("}\n");
                 } else {
                     // const value
                     printf("Name: %s, Type: const %s, Value: ", symbol->name, symbol->type);

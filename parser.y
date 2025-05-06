@@ -261,6 +261,8 @@ expression:
         Symbol *symbol = lookupSymbol(currentTable, $1);
         if (!symbol) {
             yyerror("Variable not declared");
+        } else if (symbol->isArray) {
+            yyerror("Need specify index for array variable");
         } else {
             if (strcmp(symbol->type, "int") == 0) {
                 $$.type = "INT";
@@ -277,6 +279,27 @@ expression:
             } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
                 $$.type = "STRING";
                 $$.value = strdup(symbol->value.stringValue);
+            }
+        }
+    }
+    | ID DELIM_LBRACK expression DELIM_RBRACK {
+        Symbol *symbol = lookupSymbol(currentTable, $1);
+        if (!symbol) {
+            yyerror("Variable not declared");
+        } else if (!symbol->isArray) {
+            yyerror("Variable is not an array");
+        } else if (strcmp($3.type, "INT") != 0) {
+            yyerror("Array index must be an integer");
+        } else {
+            $$.type = symbol->type;
+            $$.value = malloc(sizeof(int));
+            int index = *(int *)$3.value;
+            if (index < 0 || index >= symbol->arraySize) {
+                yyerror("Array index out of bounds");
+            } else {
+                // get value from array
+                int *arr = (int *)symbol->value;
+                *(int *)$$.value = arr[index];
             }
         }
     }
@@ -585,13 +608,13 @@ print:
     KW_PRINT expression DELIM_SEMICOLON {
         // printf("Print statement: %s\n", $2); // for debugging
         if (strcmp($2.type, "INT") == 0) {
-            // printf("%d\n", *(int *)$2.value);
+            // printf("%d", *(int *)$2.value);
         } else if (strcmp($2.type, "REAL") == 0) {
-            // printf("%f\n", *(float *)$2.value);
+            // printf("%f", *(float *)$2.value);
         } else if (strcmp($2.type, "BOOL") == 0) {
-            // printf("%s\n", *(bool *)$2.value ? "true" : "false");
+            // printf("%s", *(bool *)$2.value ? "true" : "false");
         } else if (strcmp($2.type, "STRING") == 0) {
-            // printf("%s\n", (char *)$2.value);
+            // printf("%s", (char *)$2.value);
         } else {
             yyerror("Invalid type for print statement");
         }
