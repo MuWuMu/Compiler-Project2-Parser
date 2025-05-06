@@ -50,7 +50,6 @@ void yyerror(const char *s) {
 %type <expr> expression
 %type <node> array_declaration
 %type <node> array_initializer
-%type <boolval> conditional
 
 %left OP_OR
 %left OP_AND
@@ -232,11 +231,6 @@ array_initializer:
         $$->value = $1.value;
         $$->next = $3;
     }
-    ;
-
-expressions:
-    expression expressions
-    | /* empty */
     ;
 
 expression:
@@ -519,11 +513,6 @@ expression:
     }
     ;
 
-assignments:
-    assignment assignments
-    | /* empty */
-    ;
-
 assignment:
     ID OP_ASSIGN expression DELIM_SEMICOLON {   
         Symbol *symbol = lookupSymbol(currentTable, $1);
@@ -534,21 +523,21 @@ assignment:
         } else {
             // check if the type of the variable matches the type of the expression
             if (strcmp(symbol->type, "int") == 0 && strcmp($3.type, "INT") == 0) {
-                // int to int assignment
-                symbol->value.intValue = *(int *)$3.value;
+                // // int to int assignment
+                // symbol->value.intValue = *(int *)$3.value;
             } else if ((strcmp(symbol->type, "float") == 0) || (strcmp(symbol->type, "double") == 0) && strcmp($3.type, "REAL") == 0) {
-                // float to float assignment
-                symbol->value.realValue = *(float *)$3.value;
+                // // float to float assignment
+                // symbol->value.realValue = *(float *)$3.value;
             } else if (strcmp(symbol->type, "bool") == 0 && strcmp($3.type, "BOOL") == 0) {
-                // bool to bool assignment
-                symbol->value.boolValue = *(bool *)$3.value;
+                // // bool to bool assignment
+                // symbol->value.boolValue = *(bool *)$3.value;
             } else if ((strcmp(symbol->type, "char") == 0) || (strcmp(symbol->type, "string") == 0) && strcmp($3.type, "STRING") == 0) {
-                // string to string assignment
-                free(symbol->value.stringValue); // free old value
-                symbol->value.stringValue = strdup((char *)$3.value);
+                // // string to string assignment
+                // free(symbol->value.stringValue); // free old value
+                // symbol->value.stringValue = strdup((char *)$3.value);
             } else {
                 yyerror("Type mismatch in assignment");
-        }
+            }
         free($3.value); // 釋放 expression 的值
         }
     }
@@ -563,6 +552,9 @@ statement:
     block
     | simple
     | expression DELIM_SEMICOLON
+    | conditional
+    | loop
+    | return_statement
     ;
 
 block:
@@ -593,13 +585,13 @@ print:
     KW_PRINT expression DELIM_SEMICOLON {
         // printf("Print statement: %s\n", $2); // for debugging
         if (strcmp($2.type, "INT") == 0) {
-            printf("%d\n", *(int *)$2.value);
+            // printf("%d\n", *(int *)$2.value);
         } else if (strcmp($2.type, "REAL") == 0) {
-            printf("%f\n", *(float *)$2.value);
+            // printf("%f\n", *(float *)$2.value);
         } else if (strcmp($2.type, "BOOL") == 0) {
-            printf("%s\n", *(bool *)$2.value ? "true" : "false");
+            // printf("%s\n", *(bool *)$2.value ? "true" : "false");
         } else if (strcmp($2.type, "STRING") == 0) {
-            printf("%s\n", (char *)$2.value);
+            // printf("%s\n", (char *)$2.value);
         } else {
             yyerror("Invalid type for print statement");
         }
@@ -607,13 +599,13 @@ print:
     | KW_PRINTLN expression DELIM_SEMICOLON {
         // printf("Println statement: %s\n", $2); // for debugging
         if (strcmp($2.type, "INT") == 0) {
-            printf("%d\n", *(int *)$2.value);
+            // printf("%d\n", *(int *)$2.value);
         } else if (strcmp($2.type, "REAL") == 0) {
-            printf("%f\n", *(float *)$2.value);
+            // printf("%f\n", *(float *)$2.value);
         } else if (strcmp($2.type, "BOOL") == 0) {
-            printf("%s\n", *(bool *)$2.value ? "true" : "false");
+            // printf("%s\n", *(bool *)$2.value ? "true" : "false");
         } else if (strcmp($2.type, "STRING") == 0) {
-            printf("%s\n", (char *)$2.value);
+            // printf("%s\n", (char *)$2.value);
         } else {
             yyerror("Invalid type for println statement");
         }
@@ -630,22 +622,22 @@ read:
             yyerror("Cannot assign to a constant variable");
         } else {
             if (strcmp(symbol->type, "int") == 0) {
-                int value;
-                scanf("%d", &value);
-                symbol->value.intValue = value;
+                // int value;
+                // scanf("%d", &value);
+                // symbol->value.intValue = value;
             } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                float value;
-                scanf("%f", &value);
-                symbol->value.realValue = value;
+                // float value;
+                // scanf("%f", &value);
+                // symbol->value.realValue = value;
             } else if (strcmp(symbol->type, "bool") == 0) {
-                bool value;
-                scanf("%d", &value);
-                symbol->value.boolValue = value;
+                // bool value;
+                // scanf("%d", &value);
+                // symbol->value.boolValue = value;
             } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
-                char value[100];
-                scanf("%s", value);
-                free(symbol->value.stringValue); // free old value
-                symbol->value.stringValue = strdup(value);
+                // char value[100];
+                // scanf("%s", value);
+                // free(symbol->value.stringValue); // free old value
+                // symbol->value.stringValue = strdup(value);
             } else {
                 yyerror("Invalid type for read statement");
             }
@@ -663,9 +655,9 @@ increment_decrement:
             yyerror("Cannot assign to a constant variable");
         } else {
             if (strcmp(symbol->type, "int") == 0) {
-                symbol->value.intValue++;
+                // symbol->value.intValue++;
             } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                symbol->value.realValue++;
+                // symbol->value.realValue++;
             } else {
                 yyerror("Invalid type for increment statement");
             }
@@ -698,23 +690,23 @@ conditional:
     KW_IF DELIM_LPAR expression DELIM_RPAR simple {
         // printf("If statement: %s\n", $3); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute simple statement
-            } else {
-                // skip simple statement
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute simple statement
+            // } else {
+            //     // skip simple statement
+            // }
         } else {
             yyerror("Invalid type for if condition");
         }
     }
-    KW_IF DELIM_LPAR expression DELIM_RPAR block {
+    | KW_IF DELIM_LPAR expression DELIM_RPAR block {
         // printf("If statement\n"); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute block
-            } else {
-                // skip block
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute block
+            // } else {
+            //     // skip block
+            // }
         } else {
             yyerror("Invalid type for if condition");
         }
@@ -722,11 +714,11 @@ conditional:
     | KW_IF DELIM_LPAR expression DELIM_RPAR simple KW_ELSE simple {
         // printf("If-else statement\n"); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute first block
-            } else {
-                // execute second block
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute first block
+            // } else {
+            //     // execute second block
+            // }
         } else {
             yyerror("Invalid type for if condition");
         }
@@ -734,11 +726,11 @@ conditional:
     | KW_IF DELIM_LPAR expression DELIM_RPAR simple KW_ELSE block {
         // printf("If-else statement\n"); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute first block
-            } else {
-                // execute second block
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute first block
+            // } else {
+            //     // execute second block
+            // }
         } else {
             yyerror("Invalid type for if condition");
         }
@@ -746,11 +738,11 @@ conditional:
     | KW_IF DELIM_LPAR expression DELIM_RPAR block KW_ELSE simple {
         // printf("If-else statement\n"); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute first block
-            } else {
-                // execute second block
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute first block
+            // } else {
+            //     // execute second block
+            // }
         } else {
             yyerror("Invalid type for if condition");
         }
@@ -758,13 +750,115 @@ conditional:
     | KW_IF DELIM_LPAR expression DELIM_RPAR block KW_ELSE block {
         // printf("If-else statement\n"); // for debugging
         if (strcmp($3.type, "BOOL") == 0) {
-            if (*(bool *)$3.value) {
-                // execute first block
-            } else {
-                // execute second block
-            }
+            // if (*(bool *)$3.value) {
+            //     // execute first block
+            // } else {
+            //     // execute second block
+            // }
         } else {
             yyerror("Invalid type for if condition");
+        }
+    }
+    ;
+
+loop:
+    KW_WHILE DELIM_LPAR expression DELIM_RPAR simple {
+        // printf("While statement: %s\n", $3); // for debugging
+        if (strcmp($3.type, "BOOL") == 0) {
+            // while (*(bool *)$3.value) {
+            //     // execute simple statement
+            // }
+        } else {
+            yyerror("Invalid type for while condition");
+        }
+    }
+    | KW_WHILE DELIM_LPAR expression DELIM_RPAR block {
+        // printf("While statement\n"); // for debugging
+        if (strcmp($3.type, "BOOL") == 0) {
+            // while (*(bool *)$3.value) {
+            //     // execute block
+            // }
+        } else {
+            yyerror("Invalid type for while condition");
+        }
+    }
+    | KW_FOR DELIM_LPAR simple DELIM_COMMA expression DELIM_COMMA simple DELIM_RPAR simple {
+        // printf("For statement\n"); // for debugging
+        if (strcmp($5.type, "BOOL") == 0) {
+            // while (*(bool *)$5.value) {
+            //     // execute simple statement
+            // }
+        } else {
+            yyerror("Invalid type for for condition");
+        }
+    }
+    | KW_FOR DELIM_LPAR simple DELIM_COMMA expression DELIM_COMMA simple DELIM_RPAR block {
+        // printf("For statement\n"); // for debugging
+        if (strcmp($5.type, "BOOL") == 0) {
+            // while (*(bool *)$5.value) {
+            //     // execute simple statement
+            // }
+        } else {
+            yyerror("Invalid type for for condition");
+        }
+    }
+    | KW_FOREACH DELIM_LPAR ID DELIM_COLON expression DELIM_DOT DELIM_DOT expression DELIM_RPAR simple {
+        if (strcmp($5.type, "INT") != 0 || strcmp($8.type, "INT") != 0) {
+            yyerror("Foreach range must be integers");
+        } else {
+            // int start = *(int *)$5.value;
+            // int end = *(int *)$7.value;
+
+            // for (int i = start; i <= end; i++) {
+            //     // execute simple statement
+            //     Symbol *symbol = lookupSymbol(currentTable, $3);
+            //     if (!symbol) {
+            //         yyerror("Variable not declared");
+            //     } else if (symbol->isConst) {
+            //         yyerror("Cannot assign to a constant variable");
+            //     } else {
+            //         symbol->value.intValue = i;
+            //     }
+            //     // execute simple statement
+            // }
+        }
+    }
+    | KW_FOREACH DELIM_LPAR ID DELIM_COLON expression DELIM_DOT DELIM_DOT expression DELIM_RPAR block {
+        if (strcmp($5.type, "INT") != 0 || strcmp($8.type, "INT") != 0) {
+            yyerror("Foreach range must be integers");
+        } else {
+            // int start = *(int *)$5.value;
+            // int end = *(int *)$7.value;
+
+            // for (int i = start; i <= end; i++) {
+            //     // execute simple statement
+            //     Symbol *symbol = lookupSymbol(currentTable, $3);
+            //     if (!symbol) {
+            //         yyerror("Variable not declared");
+            //     } else if (symbol->isConst) {
+            //         yyerror("Cannot assign to a constant variable");
+            //     } else {
+            //         symbol->value.intValue = i;
+            //     }
+            //     // execute block
+            // }
+        }
+    }
+    ;
+
+return_statement:
+    KW_RETURN expression DELIM_SEMICOLON {
+        // printf("Return statement: %s\n", $2); // for debugging
+        if (strcmp($2.type, "INT") == 0) {
+            // return *(int *)$2.value;
+        } else if (strcmp($2.type, "REAL") == 0) {
+            // return *(float *)$2.value;
+        } else if (strcmp($2.type, "BOOL") == 0) {
+            // return *(bool *)$2.value;
+        } else if (strcmp($2.type, "STRING") == 0) {
+            // return (char *)$2.value;
+        } else {
+            yyerror("Invalid type for return statement");
         }
     }
     ;
@@ -807,4 +901,5 @@ int main(int argc, char **argv) {
 
     fclose(yyin);
     return 0;
+    /* 連夜趕工才發現自己根本越寫越歪，只要做syntax analysis就好，多做了很多沒用的功能，bruh */
 }

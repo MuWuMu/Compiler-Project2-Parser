@@ -112,31 +112,40 @@ void dumpSymbolTable(SymbolTable *table) {
     for (int i = 0; i < HASH_SIZE; i++) {
         Symbol *symbol = table->table[i];
         while (symbol != NULL) {
-            printf("Name: %s, Type: %s, Const: %d, ", symbol->name, symbol->type, symbol->isConst);
-            if (symbol->isArray) {
-                printf("Array of size %d, Values: {", symbol->arraySize);
-                int *array = (int *)symbol->value.arrayValue;
-                for (int j = 0; j < symbol->arraySize; j++) {
+            if (symbol->isConst) {
+                if (symbol->isArray) {
+                    // const array
+                    printf("Name: %s, Type: const %s, Array size: %d, Values: {", 
+                            symbol->name, symbol->type, symbol->arraySize);
+                    int *array = (int *)symbol->value.arrayValue;
+                    for (int j = 0; j < symbol->arraySize; j++) {
                     printf("%d", array[j]);
                     if (j < symbol->arraySize - 1) {
                         printf(", ");
                     }
+                 }
+                 printf("}\n");
+                } else {
+                    // const value
+                    printf("Name: %s, Type: const %s, Value: ", symbol->name, symbol->type);
+                    if (strcmp(symbol->type, "bool") == 0) {
+                        printf("%s\n", symbol->value.boolValue ? "true" : "false");
+                    } else if (strcmp(symbol->type, "int") == 0) {
+                        printf("%d\n", symbol->value.intValue);
+                    } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+                        printf("%f\n", symbol->value.realValue);
+                    } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
+                        printf("%s\n", symbol->value.stringValue);
+                    }
                 }
-                printf("}\n");
             } else {
-                printf("Value: ");
-                if (strcmp(symbol->type, "bool") == 0) {
-                    printf("%s\n", symbol->value.boolValue ? "true" : "false");
-                } else if (strcmp(symbol->type, "int") == 0) {
-                    printf("%d\n", symbol->value.intValue);
-                } else if (strcmp(symbol->type, "float") == 0) {
-                    printf("%f\n", symbol->value.realValue);
-                } else if (strcmp(symbol->type, "double") == 0) {
-                    printf("%f\n", symbol->value.realValue);
-                } else if (strcmp(symbol->type, "char") == 0) {
-                    printf("%s\n", symbol->value.stringValue);
-                } else if (strcmp(symbol->type, "string") == 0) {
-                    printf("%s\n", symbol->value.stringValue);
+                if (symbol->isArray) {
+                    // non-const array
+                    printf("Name: %s, Type: %s, Array size: %d\n", 
+                        symbol->name, symbol->type, symbol->arraySize);
+                } else {
+                    // Non-const variable
+                    printf("Name: %s, Type: %s\n", symbol->name, symbol->type);
                 }
             }
             symbol = symbol->next;
