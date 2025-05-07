@@ -51,9 +51,11 @@ void yyerror(const char *s) {
 %type <string> type_specifier
 %type <node> declarator_list
 %type <expr> expression
+%type <expr> arithmetic_expression
 %type <node> array_declaration
 %type <node> array_initializer
 %type <param> parameter_list
+%type <expr> function_invocation
 
 %left OP_OR
 %left OP_AND
@@ -314,56 +316,8 @@ array_initializer:
     }
     ;
 
-expression:
-    INT {
-        $$.type = "INT";
-        $$.value = malloc(sizeof(int));
-        *(int *)$$.value = $1;
-        // printf("Expression type: INT, value: %d\n", $1); // for debugging
-    }
-    | REAL {
-        $$.type = "REAL";
-        $$.value = malloc(sizeof(float));
-        *(float *)$$.value = $1;
-        // printf("Expression type: REAL, value: %f\n", $1); // for debugging
-    }
-    | BOOL {
-        $$.type = "BOOL";
-        $$.value = malloc(sizeof(bool));
-        *(bool *)$$.value = $1;
-        // printf("Expression type: BOOL, value: %s\n", $1 ? "true" : "false"); // for debugging
-    }
-    | STRING {
-        $$.type = "STRING";
-        $$.value = strdup($1);
-        // printf("Expression type: STRING, value: %s\n", $1); // for debugging
-    }
-    | ID {
-        Symbol *symbol = lookupSymbol(currentTable, $1);
-        if (!symbol) {
-            yyerror("Variable not declared");
-        } else if (symbol->isArray) {
-            yyerror("Need specify index for array variable");
-        } else {
-            if (strcmp(symbol->type, "int") == 0) {
-                $$.type = "INT";
-                $$.value = malloc(sizeof(int));
-                *(int *)$$.value = symbol->value.intValue;
-            } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                $$.type = "REAL";
-                $$.value = malloc(sizeof(float));
-                *(float *)$$.value = symbol->value.realValue;
-            } else if (strcmp(symbol->type, "bool") == 0) {
-                $$.type = "BOOL";
-                $$.value = malloc(sizeof(bool));
-                *(bool *)$$.value = symbol->value.boolValue;
-            } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
-                $$.type = "STRING";
-                $$.value = strdup(symbol->value.stringValue);
-            }
-        }
-    }
-    | ID DELIM_LBRACK expression DELIM_RBRACK {
+arithmetic_expression:
+    ID DELIM_LBRACK expression DELIM_RBRACK {
         Symbol *symbol = lookupSymbol(currentTable, $1);
         if (!symbol) {
             yyerror("Variable not declared");
@@ -632,6 +586,80 @@ expression:
         $$.type = $2.type;
         $$.value = $2.value;
     }
+
+expression:
+    INT {
+        $$.type = "INT";
+        $$.value = malloc(sizeof(int));
+        *(int *)$$.value = $1;
+        // printf("Expression type: INT, value: %d\n", $1); // for debugging
+    }
+    | REAL {
+        $$.type = "REAL";
+        $$.value = malloc(sizeof(float));
+        *(float *)$$.value = $1;
+        // printf("Expression type: REAL, value: %f\n", $1); // for debugging
+    }
+    | BOOL {
+        $$.type = "BOOL";
+        $$.value = malloc(sizeof(bool));
+        *(bool *)$$.value = $1;
+        // printf("Expression type: BOOL, value: %s\n", $1 ? "true" : "false"); // for debugging
+    }
+    | STRING {
+        $$.type = "STRING";
+        $$.value = strdup($1);
+        // printf("Expression type: STRING, value: %s\n", $1); // for debugging
+    }
+    | ID {
+        Symbol *symbol = lookupSymbol(currentTable, $1);
+        if (!symbol) {
+            yyerror("Variable not declared");
+        } else if (symbol->isArray) {
+            yyerror("Need specify index for array variable");
+        } else {
+            if (strcmp(symbol->type, "int") == 0) {
+                $$.type = "INT";
+                $$.value = malloc(sizeof(int));
+                *(int *)$$.value = symbol->value.intValue;
+            } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+                $$.type = "REAL";
+                $$.value = malloc(sizeof(float));
+                *(float *)$$.value = symbol->value.realValue;
+            } else if (strcmp(symbol->type, "bool") == 0) {
+                $$.type = "BOOL";
+                $$.value = malloc(sizeof(bool));
+                *(bool *)$$.value = symbol->value.boolValue;
+            } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
+                $$.type = "STRING";
+                $$.value = strdup(symbol->value.stringValue);
+            }
+        }
+    }
+    | arithmetic_expression
+    | function_invocation {
+        // void function(procedure) has no return value
+        if (strcmp($1.type, "void") == 0) {
+            yyerror("Void function cannot be used in expression");
+        } else {
+            if (strcmp($1.type, "int") == 0) {
+                $$.type = "INT";
+                $$.value = malloc(sizeof(int));
+                *(int *)$$.value = *(int *)$1.value;
+            } else if (strcmp($1.type, "float") == 0 || strcmp($1.type, "double") == 0) {
+                $$.type = "REAL";
+                $$.value = malloc(sizeof(float));
+                *(float *)$$.value = *(float *)$1.value;
+            } else if (strcmp($1.type, "bool") == 0) {
+                $$.type = "BOOL";
+                $$.value = malloc(sizeof(bool));
+                *(bool *)$$.value = *(bool *)$1.value;
+            } else if (strcmp($1.type, "string") == 0 || strcmp($1.type, "char") == 0) {
+                $$.type = "STRING";
+                $$.value = strdup((char *)$1.value);
+            }
+        }
+    }
     ;
 
 assignment:
@@ -659,7 +687,7 @@ assignment:
             } else {
                 yyerror("Type mismatch in assignment");
             }
-        free($3.value); // 釋放 expression 的值
+        free($3.value); // release value of expression
         }
     }
     ;
@@ -672,12 +700,12 @@ statements:
 statement:
     block
     | simple
-    | expression DELIM_SEMICOLON
     | conditional
     | loop
     | return_statement
+    
     | declaration
-    // | function_invocation
+    | array_declaration
     ;
 
 block:
@@ -702,6 +730,8 @@ simple:
     | read
     | increment_decrement
     | semicolon_only
+    | arithmetic_expression DELIM_SEMICOLON
+    | function_invocation DELIM_SEMICOLON
     ;
 
 print:
@@ -1090,43 +1120,45 @@ parameter_list:
     }
     ;
 
-// function_invocation:
-//     ID DELIM_LPAR argument_list DELIM_RPAR DELIM_SEMICOLON {
-//         // check if the function is declared
-//         Function *func = lookupFunction(functionTable, $1);
-//         if (!func) {
-//             yyerror("Function not declared");
-//         } else {
-//             // check if the number of arguments matches the number of parameters
-//             int numArgs = 0;
-//             Argument *arg = $3;
-//             while (arg != NULL) {
-//                 numArgs++;
-//                 arg = arg->next;
-//             }
-//             int numParams = 0;
-//             Parameter *param = func->params;
-//             while (param != NULL) {
-//                 numParams++;
-//                 param = param->next;
-//             }
-//             if (numArgs != numParams) {
-//                 yyerror("Number of arguments does not match number of parameters");
-//             } else {
-//                 // check if the types of arguments match the types of parameters
-//                 arg = $3;
-//                 param = func->params;
-//                 while (arg != NULL && param != NULL) {
-//                     if (strcmp(arg->type, param->type) != 0) {
-//                         yyerror("Type mismatch in function invocation");
-//                     }
-//                     arg = arg->next;
-//                     param = param->next;
-//                 }
-//             }
-//         }
-//     }
-//     ;
+function_invocation:    //TODO: fix parameter calling and call-by-value
+    ID DELIM_LPAR parameter_list DELIM_RPAR {
+        // check if the function is declared
+        Function *func = lookupFunction(functionTable, $1);
+        if (!func) {
+            yyerror("Function not declared");
+        } else {
+            // check if the number of arguments matches the number of parameters
+            int numArgs = 0;
+            Parameter *arg = $3;
+            while (arg != NULL) {
+                numArgs++;
+                arg = arg->next;
+            }
+            int numParams = 0;
+            Parameter *param = func->parameters;
+            while (param != NULL) {
+                numParams++;
+                param = param->next;
+            }
+            if (numArgs != numParams) {
+                yyerror("Number of arguments does not match number of parameters");
+            } else {
+                // check if the types of arguments match the types of parameters
+                arg = $3;
+                param = func->parameters;
+                while (arg != NULL && param != NULL) {
+                    if (strcmp(arg->type, param->type) != 0) {
+                        yyerror("Type mismatch in function invocation");
+                    }
+                    arg = arg->next;
+                    param = param->next;
+                }
+            }
+            $$.type = func->type;
+            $$.value = malloc(sizeof(void *)); // allocate memory for the return value
+        }
+    }
+    ;
 
 
 %%
