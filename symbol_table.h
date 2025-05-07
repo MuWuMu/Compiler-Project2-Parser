@@ -40,6 +40,7 @@ typedef struct SymbolTable {
 SymbolTable* createSymbolTable(SymbolTable *parent);
 void insertSymbol(SymbolTable *table, const char *name, const char *type, int isConst, void *value, int isArray, int arraySize);
 Symbol* lookupSymbol(SymbolTable *table, const char *name);
+Symbol* lookupSymbolInCurrentTable(SymbolTable *table, const char *name);
 void deleteSymbolTable(SymbolTable *table);
 void dumpSymbolTable(SymbolTable *table);
 

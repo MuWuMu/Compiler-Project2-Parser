@@ -9,4 +9,5 @@ bool h = a > b && b < c; // 測試邏輯運算
 bool i = !(a == b || c != d); // 測試邏輯非與括號優先級
 
 void main() {
+    int j = 6;
 }

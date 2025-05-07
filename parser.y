@@ -167,8 +167,23 @@ array_declaration:
             yyerror("Duplicate declaration of array");
         } else {
             // init with 0
-            void *array = calloc($4, sizeof(int));
-            insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            if (strcmp($1, "int") == 0) {
+                // int array[$4];
+                int *array = (int *)calloc($4, sizeof(int));
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
+                // float array[$4];
+                float *array = (float *)calloc($4, sizeof(float));
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "bool") == 0) {
+                // bool array[$4];
+                bool *array = (bool *)calloc($4, sizeof(bool));
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
+                // char array[$4];
+                char **array = (char **)calloc($4, sizeof(char *));
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            }
             // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
         }
     }
@@ -179,16 +194,52 @@ array_declaration:
         if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
         } else {
-            // 初始化陣列
-            void *array = calloc($4, sizeof(int));
-            int *arr = (int *)array;
-            int i = 0;
-            Node *init = $8;
-            while (init != NULL && i < $4) {
-                arr[i++] = *(int *)init->value;
-                init = init->next;
+            // init array with initialization values
+            if (strcmp($1, "int") == 0) {
+                // int array[$4];
+                int *array = (int *)calloc($4, sizeof(int));
+                int *arr = (int *)array;
+                int i = 0;
+                Node *init = $8;
+                while (init != NULL && i < $4) {
+                    arr[i++] = *(int *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
+                // float array[$4];
+                float *array = (float *)calloc($4, sizeof(float));
+                float *arr = (float *)array;
+                int i = 0;
+                Node *init = $8;
+                while (init != NULL && i < $4) {
+                    arr[i++] = *(float *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "bool") == 0) {
+                // bool array[$4];
+                bool *array = (bool *)calloc($4, sizeof(bool));
+                bool *arr = (bool *)array;
+                int i = 0;
+                Node *init = $8;
+                while (init != NULL && i < $4) {
+                    arr[i++] = *(bool *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
+                // char array[$4];
+                char **array = (char **)calloc($4, sizeof(char *));
+                char **arr = (char **)array;
+                int i = 0;
+                Node *init = $8;
+                while (init != NULL && i < $4) {
+                    arr[i++] = strdup((char *)init->value);
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
             }
-            insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
             // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
         }
     }
@@ -200,15 +251,51 @@ array_declaration:
             yyerror("Duplicate declaration of array");
         } else {
             // init array with initialization values
-            void *array = calloc($5, sizeof(int));
-            int *arr = (int *)array;
-            int i = 0;
-            Node *init = $9;
-            while (init != NULL && i < $5) {
-                arr[i++] = *(int *)init->value;
-                init = init->next;
+            if (strcmp($2, "int") == 0) {
+                // int array[$5];
+                int *array = (int *)calloc($5, sizeof(int));
+                int *arr = (int *)array;
+                int i = 0;
+                Node *init = $9;
+                while (init != NULL && i < $5) {
+                    arr[i++] = *(int *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            } else if (strcmp($2, "float") == 0 || strcmp($2, "double") == 0) {
+                // float array[$5];
+                float *array = (float *)calloc($5, sizeof(float));
+                float *arr = (float *)array;
+                int i = 0;
+                Node *init = $9;
+                while (init != NULL && i < $5) {
+                    arr[i++] = *(float *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            } else if (strcmp($2, "bool") == 0) {
+                // bool array[$5];
+                bool *array = (bool *)calloc($5, sizeof(bool));
+                bool *arr = (bool *)array;
+                int i = 0;
+                Node *init = $9;
+                while (init != NULL && i < $5) {
+                    arr[i++] = *(bool *)init->value;
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            } else if (strcmp($2, "char") == 0 || strcmp($2, "string") == 0) {
+                // char array[$5];
+                char **array = (char **)calloc($5, sizeof(char *));
+                char **arr = (char **)array;
+                int i = 0;
+                Node *init = $9;
+                while (init != NULL && i < $5) {
+                    arr[i++] = strdup((char *)init->value);
+                    init = init->next;
+                }
+                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
             }
-            insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
             // printf("Declared const array: %s, size=%d\n", $3, $5); // for debugging
         }
     }
@@ -291,15 +378,32 @@ expression:
         } else if (strcmp($3.type, "INT") != 0) {
             yyerror("Array index must be an integer");
         } else {
-            $$.type = symbol->type;
-            $$.value = malloc(sizeof(int));
             int index = *(int *)$3.value;
             if (index < 0 || index >= symbol->arraySize) {
                 yyerror("Array index out of bounds");
             } else {
                 // get value from array
-                int *arr = (int *)symbol->value;
-                *(int *)$$.value = arr[index];
+                if (strcmp(symbol->type, "int") == 0) {
+                    $$.type = "INT";
+                    $$.value = malloc(sizeof(int));
+                    int *arr = (int *)symbol->value.arrayValue;
+                    *(int *)$$.value = arr[index];
+                } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+                    $$.type = "REAL";
+                    $$.value = malloc(sizeof(float));
+                    float *arr = (float *)symbol->value.arrayValue;
+                    *(float *)$$.value = arr[index];
+                } else if (strcmp(symbol->type, "bool") == 0) {
+                    $$.type = "BOOL";
+                    $$.value = malloc(sizeof(bool));
+                    bool *arr = (bool *)symbol->value.arrayValue;
+                    *(bool *)$$.value = arr[index];
+                } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
+                    $$.type = "STRING";
+                    $$.value = malloc(sizeof(char *));
+                    char **arr = (char **)symbol->value.arrayValue;
+                    *(char **)$$.value = strdup(arr[index]);
+                }
             }
         }
     }
@@ -578,6 +682,7 @@ statement:
     | conditional
     | loop
     | return_statement
+    | declaration
     ;
 
 block:
