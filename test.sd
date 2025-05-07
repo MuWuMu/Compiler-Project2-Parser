@@ -1,13 +1,14 @@
 int a = 10;
-int b = -a; // 測試一元負號
-int c = a - b; // 測試二元減法
-int d = -a - b; // 測試一元負號與二元減法的結合
-int e = (a + b) * 2; // 測試括號優先級
-float f = -3.5; // 測試一元負號與浮點數
-float g = f + a; // 測試整數與浮點數相加
-bool h = a > b && b < c; // 測試邏輯運算
-bool i = !(a == b || c != d); // 測試邏輯非與括號優先級
+const int b = -3;
+
+int func(int x, int y) {
+    return x + y;
+}
 
 void main() {
     int j = 6;
+    const int a;
+    float b;
+    int c = 5;
 }
+

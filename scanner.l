@@ -5,6 +5,7 @@
 #include <ctype.h>
 
 #include "symbol_table.h"
+#include "function_table.h"
 #include "y.tab.h" // for token return by yacc
 
 #define MAX_LINE_LENG 256

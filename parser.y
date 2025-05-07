@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "symbol_table.h"
+#include "function_table.h"
 
 // get token that recognized by scanner
 extern int yylex();
@@ -14,6 +15,7 @@ extern char *yytext;
 extern int linenum;
 
 SymbolTable *currentTable = NULL;
+FunctionTable *functionTable = NULL;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
@@ -33,6 +35,7 @@ void yyerror(const char *s) {
         char *type;
         void *value;
     } expr;         // For expression (multi-type: int, float, string...)
+    Parameter *param ; // For function parameters
 }
 
 // define token
@@ -50,6 +53,7 @@ void yyerror(const char *s) {
 %type <expr> expression
 %type <node> array_declaration
 %type <node> array_initializer
+%type <param> parameter_list
 
 %left OP_OR
 %left OP_AND
@@ -61,24 +65,14 @@ void yyerror(const char *s) {
 
 %%
 
-program: //TODO: now just to test the parser
-    // declarations program
-    // | functions program
-    // | main_function 
-    // ;
-    declarations main_function
-    | main_function   
+program:
+    declaration program
+    | function_declaration program
+    | main_function 
     ;
 
 main_function:
     KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR block
-    ;
-    // KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR DELIM_LBRACE DELIM_RBRACE
-    // ;
-
-declarations:
-    declaration declarations
-    | /* empty */
     ;
 
 declaration:
@@ -683,6 +677,7 @@ statement:
     | loop
     | return_statement
     | declaration
+    // | function_invocation
     ;
 
 block:
@@ -991,6 +986,147 @@ return_statement:
     }
     ;
 
+function_declaration:
+    type_specifier ID DELIM_LPAR parameter_list DELIM_RPAR DELIM_LBRACE {
+        // check if the function is already declared
+        if (lookupFunction(functionTable, $2)) {
+            yyerror("Function already declared");
+        } else {
+            // check if parameter list has duplicate names
+            Parameter *param = $4;
+            Parameter *nextParam = param->next;
+            while (param != NULL) {
+                while (nextParam != NULL) {
+                    if (strcmp(param->name, nextParam->name) == 0) {
+                        yyerror("Duplicate parameter name in function declaration");
+                    }
+                    nextParam = nextParam->next;
+                }
+                param = param->next;
+                if (param != NULL) // Avoid dereferencing NULL pointer
+                    nextParam = param->next;
+            }
+            // add function to the function table
+            insertFunction(functionTable, $2, $1, $4);
+        }
+        //create a new symbol table for block
+        SymbolTable *newTable = createSymbolTable(currentTable);
+        currentTable = newTable;
+        // add all arguments to the symbol table
+        Parameter *param = $4;
+        while (param != NULL) {
+            insertSymbol(currentTable, param->name, param->type, 0, NULL, 0, 0);
+            param = param->next;
+        }
+    }
+    statements
+    DELIM_RBRACE {
+        // dump and delete the current symbol table, currnet table set to parent table
+        SymbolTable *parentTable = currentTable->parent;
+        dumpSymbolTable(currentTable);
+        deleteSymbolTable(currentTable);
+        currentTable = parentTable;
+    }
+    | KW_VOID ID DELIM_LPAR parameter_list DELIM_RPAR DELIM_LBRACE {
+        // check if the function is already declared
+        if (lookupFunction(functionTable, $2)) {
+            yyerror("Function already declared");
+        } else {
+            // check if parameter list has duplicate names
+            Parameter *param = $4;
+            Parameter *nextParam = param->next;
+            while (param != NULL) {
+                while (nextParam != NULL) {
+                    if (strcmp(param->name, nextParam->name) == 0) {
+                        yyerror("Duplicate parameter name in function declaration");
+                    }
+                    nextParam = nextParam->next;
+                }
+                param = param->next;
+                if (param != NULL) // Avoid dereferencing NULL pointer
+                    nextParam = param->next;
+            }
+            // add function to the function table
+            insertFunction(functionTable, $2, "void", $4);
+        }
+        //create a new symbol table for block
+        SymbolTable *newTable = createSymbolTable(currentTable);
+        currentTable = newTable;
+        // add all arguments to the symbol table
+        Parameter *param = $4;
+        while (param != NULL) {
+            insertSymbol(currentTable, param->name, param->type, 0, NULL, 0, 0);
+            param = param->next;
+        }
+    }
+    statements
+    DELIM_RBRACE {
+        // dump and delete the current symbol table, currnet table set to parent table
+        SymbolTable *parentTable = currentTable->parent;
+        dumpSymbolTable(currentTable);
+        deleteSymbolTable(currentTable);
+        currentTable = parentTable;
+    }
+    ;
+
+parameter_list: 
+    type_specifier ID {
+        // single parameter
+        $$ = (Parameter *)malloc(sizeof(Parameter));
+        $$->name = strdup($2);
+        $$->type = strdup($1);
+        $$->next = NULL;
+    }
+    | type_specifier ID DELIM_COMMA parameter_list {
+        // multiple parameters
+        $$ = (Parameter *)malloc(sizeof(Parameter));
+        $$->name = strdup($2);
+        $$->type = strdup($1);
+        $$->next = $4;
+    }
+    | /* empty */ {
+        // no parameters
+        $$ = NULL;
+    }
+    ;
+
+// function_invocation:
+//     ID DELIM_LPAR argument_list DELIM_RPAR DELIM_SEMICOLON {
+//         // check if the function is declared
+//         Function *func = lookupFunction(functionTable, $1);
+//         if (!func) {
+//             yyerror("Function not declared");
+//         } else {
+//             // check if the number of arguments matches the number of parameters
+//             int numArgs = 0;
+//             Argument *arg = $3;
+//             while (arg != NULL) {
+//                 numArgs++;
+//                 arg = arg->next;
+//             }
+//             int numParams = 0;
+//             Parameter *param = func->params;
+//             while (param != NULL) {
+//                 numParams++;
+//                 param = param->next;
+//             }
+//             if (numArgs != numParams) {
+//                 yyerror("Number of arguments does not match number of parameters");
+//             } else {
+//                 // check if the types of arguments match the types of parameters
+//                 arg = $3;
+//                 param = func->params;
+//                 while (arg != NULL && param != NULL) {
+//                     if (strcmp(arg->type, param->type) != 0) {
+//                         yyerror("Type mismatch in function invocation");
+//                     }
+//                     arg = arg->next;
+//                     param = param->next;
+//                 }
+//             }
+//         }
+//     }
+//     ;
 
 
 %%
@@ -1011,6 +1147,7 @@ int main(int argc, char **argv) {
 
     // Initialize the symbol table
     currentTable = createSymbolTable(NULL);
+    functionTable = createFunctionTable();
 
     // int token;
     // while ((token = yylex()) != 0) {
@@ -1022,6 +1159,8 @@ int main(int argc, char **argv) {
         dumpSymbolTable(currentTable);
         deleteSymbolTable(currentTable);
         currentTable = NULL;
+        deleteFunctionTable(functionTable);
+        functionTable = NULL;
         printf("Parsing completed successfully.\n");
     } else {
         printf("Parsing failed.\n");
