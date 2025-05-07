@@ -89,7 +89,7 @@ declaration:
         // traverse declarator_list，insert each one into symbol table
         Node *current = $2;
         while (current != NULL) {
-            if (lookupSymbol(currentTable, current->name)) {
+            if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
                 insertSymbol(currentTable, current->name, $1, 0, current->value, 0, 0);
@@ -103,7 +103,7 @@ declaration:
 
         Node *current = $3;
         while (current != NULL) {
-            if (lookupSymbol(currentTable, current->name)) {
+            if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else if (current->value == NULL) {
                 yyerror("Const variable must be initialized");
@@ -163,7 +163,7 @@ array_declaration:
         // declare with no initialization
         // printf("Array declaration: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
 
-        if (lookupSymbol(currentTable, $2)) {
+        if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
         } else {
             // init with 0
@@ -176,7 +176,7 @@ array_declaration:
         // arrays with initialization values
         // printf("Array declaration with initialization: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
 
-        if (lookupSymbol(currentTable, $2)) {
+        if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
         } else {
             // 初始化陣列
@@ -196,7 +196,7 @@ array_declaration:
         // const array declaration with initialization values
         // printf("Const array declaration with initialization: type=%s, name=%s, size=%d\n", $2, $3, $5); // for debugging
 
-        if (lookupSymbol(currentTable, $3)) {
+        if (lookupSymbolInCurrentTable(currentTable, $3)) {
             yyerror("Duplicate declaration of array");
         } else {
             // init array with initialization values

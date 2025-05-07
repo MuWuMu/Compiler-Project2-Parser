@@ -88,6 +88,18 @@ Symbol* lookupSymbol(SymbolTable *table, const char *name) {
     return NULL; // not found
 }
 
+Symbol* lookupSymbolInCurrentTable(SymbolTable *table, const char *name) {
+    unsigned int index = hash(name);
+    Symbol *symbol = table->table[index];
+    while (symbol != NULL) {
+        if (strcmp(symbol->name, name) == 0) {
+            return symbol; // find
+        }
+        symbol = symbol->next;
+    }
+    return NULL; // not found
+}
+
 // Delete symbol table
 void deleteSymbolTable(SymbolTable *table) {
     for (int i = 0; i < HASH_SIZE; i++) {
