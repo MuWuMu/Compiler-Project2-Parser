@@ -17,6 +17,11 @@ extern int linenum;
 SymbolTable *currentTable = NULL;
 FunctionTable *functionTable = NULL;
 
+// Helper variables for function return type checking
+char *current_function_name_for_return_check = NULL;
+char *current_function_return_type_for_return_check = NULL; // Stores "int", "float", "void", etc.
+bool non_void_function_has_return_value_statement = false; // True if a 'return <expr>;' was found and type-checked
+
 void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
 }
@@ -1001,17 +1006,45 @@ loop:
 
 return_statement:
     KW_RETURN expression DELIM_SEMICOLON {
-        // printf("Return statement: %s\n", $2); // for debugging
-        if (strcmp($2.type, "INT") == 0) {
-            // return *(int *)$2.value;
-        } else if (strcmp($2.type, "REAL") == 0) {
-            // return *(float *)$2.value;
-        } else if (strcmp($2.type, "BOOL") == 0) {
-            // return *(bool *)$2.value;
-        } else if (strcmp($2.type, "STRING") == 0) {
-            // return (char *)$2.value;
+        if (current_function_return_type_for_return_check != NULL) { // inside a function
+            if (strcmp(current_function_return_type_for_return_check, "void") == 0) {
+                yyerror("Void function cannot return a value");
+            } else { // non-void function
+                bool type_match = false;
+                char *func_return_type_str = current_function_return_type_for_return_check;
+                char *expr_type_str = $2.type;
+
+                // compare funciton's declared return type with the expression's type
+                if (strcmp(func_return_type_str, "int") == 0 && strcmp(expr_type_str, "INT") == 0) {
+                    type_match = true;
+                } else if ((strcmp(func_return_type_str, "float") == 0 || strcmp(func_return_type_str, "double") == 0) && strcmp(expr_type_str, "REAL") == 0) {
+                    type_match = true;
+                } else if (strcmp(func_return_type_str, "bool") == 0 && strcmp(expr_type_str, "BOOL") == 0) {
+                    type_match = true;
+                } else if ((strcmp(func_return_type_str, "char") == 0 || strcmp(func_return_type_str, "string") == 0) && strcmp(expr_type_str, "STRING") == 0) {
+                    type_match = true;
+                }
+
+                if (!type_match) {
+                    yyerror("Return type mismatch in function");
+                } else {
+                    non_void_function_has_return_value_statement = true; // set flag to true
+                }
+            }
         } else {
-            yyerror("Invalid type for return statement");
+            yyerror("Return statement outside of a function.");
+        }
+    }
+    | KW_RETURN DELIM_SEMICOLON { // return; (without an expression)
+        if (current_function_return_type_for_return_check != NULL) { // Inside a function
+            if (strcmp(current_function_return_type_for_return_check, "void") == 0) {
+                // void function must not have a return statement"
+                yyerror("Void function cannot have any return statement");
+            } else { // Non-void function
+                yyerror("Non-void function must return a value");
+            }
+        } else {
+            yyerror("Return statement outside of a function.");
         }
     }
     ;
@@ -1038,6 +1071,10 @@ function_declaration:
             }
             // add function to the function table
             insertFunction(functionTable, $2, $1, $4);
+
+            current_function_name_for_return_check = $2;
+            current_function_return_type_for_return_check = $1; // store the declared return type
+            non_void_function_has_return_value_statement = false; // reset for this function
         }
         //create a new symbol table for block
         SymbolTable *newTable = createSymbolTable(currentTable);
@@ -1051,11 +1088,21 @@ function_declaration:
     }
     statements
     DELIM_RBRACE {
+        // check if funciton has return statement
+        if (strcmp(current_function_return_type_for_return_check, "void") != 0) {
+            if (!non_void_function_has_return_value_statement) {
+                yyerror("Non-void function must have a return statement");
+            }
+        }
         // dump and delete the current symbol table, currnet table set to parent table
         SymbolTable *parentTable = currentTable->parent;
         dumpSymbolTable(currentTable);
         deleteSymbolTable(currentTable);
         currentTable = parentTable;
+
+        // clear function helpsers
+        current_function_name_for_return_check = NULL;
+        current_function_return_type_for_return_check = NULL;
     }
     | KW_VOID ID DELIM_LPAR parameter_list DELIM_RPAR DELIM_LBRACE {
         // check if the function is already declared
@@ -1078,6 +1125,10 @@ function_declaration:
             }
             // add function to the function table
             insertFunction(functionTable, $2, "void", $4);
+
+            current_function_name_for_return_check = $2;
+            current_function_return_type_for_return_check = "void"; // store the declared return type
+            non_void_function_has_return_value_statement = false; // reset for this function
         }
         //create a new symbol table for block
         SymbolTable *newTable = createSymbolTable(currentTable);
@@ -1091,11 +1142,17 @@ function_declaration:
     }
     statements
     DELIM_RBRACE {
+        // for void function, check it has no return statement
+        // will be handled in "return_statement" rule
+
         // dump and delete the current symbol table, currnet table set to parent table
         SymbolTable *parentTable = currentTable->parent;
         dumpSymbolTable(currentTable);
         deleteSymbolTable(currentTable);
         currentTable = parentTable;
+
+        current_function_name_for_return_check = NULL;
+        current_function_return_type_for_return_check = NULL;
     }
     ;
 
