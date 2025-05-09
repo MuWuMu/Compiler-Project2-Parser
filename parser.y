@@ -68,6 +68,8 @@ void yyerror(const char *s) {
 %type <expr_val> arithmetic_expression
 %type <node> array_initializer
 %type <param> parameter_list
+%type <param> argument_list
+%type <param> argument_list_actual
 %type <expr_val> function_invocation
 %type <dim_info> dimension_specifiers
 %type <idx_acc_info> array_indices
@@ -903,6 +905,9 @@ expression:
         // void function(procedure) has no return value
         if (strcmp($1.type, "void") == 0) {
             yyerror("Void function cannot be used in expression");
+            if ($1.type) {
+                free($1.type); // Free the value if it was allocated
+            }
             $$ = default_expr_error_value(); // Set to error value
         } else {
             if (strcmp($1.type, "int") == 0) {
@@ -920,6 +925,12 @@ expression:
             } else if (strcmp($1.type, "string") == 0 || strcmp($1.type, "char") == 0) {
                 $$.type = "STRING";
                 $$.value = strdup((char *)$1.value);
+            } else {
+                yyerror("Invalid function return type");
+                $$ = default_expr_error_value(); // Set to error value
+            }
+            if ($1.value) {
+                free($1.value); // Free the value if it was allocated
             }
         }
     }
@@ -1433,8 +1444,8 @@ parameter_list:
     }
     ;
 
-function_invocation:    //TODO: fix parameter calling and call-by-value
-    ID DELIM_LPAR parameter_list DELIM_RPAR {
+function_invocation:
+    ID DELIM_LPAR argument_list DELIM_RPAR {
         // check if the function is declared
         $$ = default_expr_error_value();
         Function *func = lookupFunction(functionTable, $1);
@@ -1460,21 +1471,93 @@ function_invocation:    //TODO: fix parameter calling and call-by-value
                 // check if the types of arguments match the types of parameters
                 arg = $3;
                 param = func->parameters;
+                bool type_mismatch = false;
+                int arg_count = 0;
                 while (arg != NULL && param != NULL) {
-                    if (strcmp(arg->type, param->type) != 0) {
+                    arg_count++;
+                    bool current_arg_type_match = false;
+                    if (strcmp(arg->type, "INT") == 0 && strcmp(param->type, "int") == 0) {
+                        current_arg_type_match = true;
+                    } else if ((strcmp(arg->type, "REAL") == 0 || strcmp(arg->type, "float") == 0) && (strcmp(param->type, "float") == 0 || strcmp(param->type, "double") == 0)) {
+                        current_arg_type_match = true;
+                    } else if (strcmp(arg->type, "BOOL") == 0 && strcmp(param->type, "bool") == 0) {
+                        current_arg_type_match = true;
+                    } else if ((strcmp(arg->type, "STRING") == 0 || strcmp(arg->type, "char") == 0) && (strcmp(param->type, "string") == 0 || strcmp(param->type, "char") == 0)) {
+                        current_arg_type_match = true;
+                    }
+
+                    if (!current_arg_type_match &&
+                        (strcmp(param->type, "float") == 0 || strcmp(param->type, "double") == 0) &&
+                        strcmp(arg->type, "INT") == 0) {
+                            current_arg_type_match = true; // int can be converted to float/double
+                    }
+                    
+                    if (!current_arg_type_match) {
                         yyerror("Type mismatch in function invocation");
+                        break; // exit the loop on type mismatch
                     }
                     arg = arg->next;
                     param = param->next;
                 }
+                if (!type_mismatch) {
+                    // function invocation is valid
+                    $$.type = strdup(func->type);
+                    if (strcmp(func->type, "void") == 0) {
+                        $$.value = NULL; // void function has no return value
+                    } else {
+                        $$.value = NULL; // no need to store value
+                    }
+                }
             }
-            $$.type = func->type;
-            $$.value = malloc(sizeof(void *)); // allocate memory for the return value
+            Parameter *temp_arg = $3;
+            while (temp_arg != NULL) {
+                Parameter *next_arg = temp_arg->next;
+                if (temp_arg->type)
+                    free(temp_arg->type);
+                // if (temp_arg->value) free(temp_arg->value);
+                free(temp_arg);
+                temp_arg = next_arg;
+            }
         }
     }
     ;
 
+argument_list_actual:
+    expression {
+        // single argument
+        $$ = (Parameter *)malloc(sizeof(Parameter));
+        if (!$$) {
+            yyerror("Memory allocation failed for argument list");
+            exit(1);
+        }
+        $$->name = NULL; // no name for actual argument
+        $$->type = strdup($1.type);
+        $$->next = NULL;
 
+
+    }
+    | expression DELIM_COMMA argument_list_actual {
+        // multiple arguments
+        $$ = (Parameter *)malloc(sizeof(Parameter));
+        if (!$$) {
+            yyerror("Memory allocation failed for argument list");
+            exit(1);
+        }
+        $$->name = NULL; // no name for actual argument
+        $$->type = strdup($1.type);
+        $$->next = $3;
+    }
+    ;
+
+argument_list:
+    argument_list_actual {
+        $$ = $1;
+    }
+    | /* empty */ {
+        $$ = NULL;
+    }
+    ;
+    
 %%
 
 int main(int argc, char **argv) {
