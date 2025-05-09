@@ -6,6 +6,8 @@
 
 #include "symbol_table.h"
 #include "function_table.h"
+#include "expr_value.h"
+// #include "array_utils.h"
 
 // get token that recognized by scanner
 extern int yylex();
@@ -22,6 +24,14 @@ char *current_function_name_for_return_check = NULL;
 char *current_function_return_type_for_return_check = NULL; // Stores "int", "float", "void", etc.
 bool non_void_function_has_return_value_statement = false; // True if a 'return <expr>;' was found and type-checked
 
+// Helper function to create a default error expression value
+static inline ExprValue default_expr_error_value() {
+    ExprValue res;
+    res.type = "ERROR"; 
+    res.value = NULL;   
+    return res;
+}
+
 void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
 }
@@ -36,11 +46,10 @@ void yyerror(const char *s) {
     float realval;  // For real constants
     bool boolval;    // For boolean constants
     char *text;     // For string constants (ID, string...)
-    struct {
-        char *type;
-        void *value;
-    } expr;         // For expression (multi-type: int, float, string...)
     Parameter *param ; // For function parameters
+    DimensionInfo *dim_info; // For array dimensions
+    IndexAccessInfo *idx_acc_info; // For array access indices
+    ExprValue expr_val;
 }
 
 // define token
@@ -55,12 +64,13 @@ void yyerror(const char *s) {
 
 %type <string> type_specifier
 %type <node> declarator_list
-%type <expr> expression
-%type <expr> arithmetic_expression
-%type <node> array_declaration
+%type <expr_val> expression
+%type <expr_val> arithmetic_expression
 %type <node> array_initializer
 %type <param> parameter_list
-%type <expr> function_invocation
+%type <expr_val> function_invocation
+%type <dim_info> dimension_specifiers
+%type <idx_acc_info> array_indices
 
 %left OP_OR
 %left OP_AND
@@ -93,7 +103,7 @@ declaration:
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, current->value, 0, 0);
+                insertSymbol(currentTable, current->name, $1, 0, 0, NULL, current->value);
             }
             current = current->next;
         }
@@ -109,7 +119,7 @@ declaration:
             } else if (current->value == NULL) {
                 yyerror("Const variable must be initialized");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, current->value, 0, 0); // set as const
+                insertSymbol(currentTable, current->name, $2, 1, 0, NULL, current->value); // set as const
                 // printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
@@ -118,6 +128,20 @@ declaration:
     // array declaration
     | array_declaration
     ;
+
+dimension_specifiers:
+    DELIM_LBRACK INT DELIM_RBRACK {
+        if ($2 <= 0) {
+            yyerror("Array size must be greater than 0");
+        } 
+        $$ = create_dimension_list($2);
+    }
+    | dimension_specifiers DELIM_LBRACK INT DELIM_RBRACK {
+        if ($3 <= 0) {
+            yyerror("Array size must be greater than 0");
+        } 
+        $$ = add_dimension_to_list($1, $3);
+    }
 
 type_specifier:
     KW_INT { $$ = "int";}
@@ -160,149 +184,205 @@ declarator_list:
     ;
 
 array_declaration:
-    type_specifier ID DELIM_LBRACK INT DELIM_RBRACK DELIM_SEMICOLON {
-        // declare with no initialization
-        // printf("Array declaration: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
-
+    type_specifier ID dimension_specifiers DELIM_SEMICOLON {
         if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
+            free_dimension_info($3); // free dimension info
         } else {
-            // init with 0
-            if (strcmp($1, "int") == 0) {
-                // int array[$4];
-                int *array = (int *)calloc($4, sizeof(int));
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
-                // float array[$4];
-                float *array = (float *)calloc($4, sizeof(float));
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "bool") == 0) {
-                // bool array[$4];
-                bool *array = (bool *)calloc($4, sizeof(bool));
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
-                // char array[$4];
-                char **array = (char **)calloc($4, sizeof(char *));
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            void *arr_data = create_md_array_data($1, $3); // $1 is string, $3 is DimensionInfo
+            if (arr_data) {
+                initialize_md_array_data(arr_data, $1, $3, NULL); // NULL to default init
+                insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
+            } else {
+                yyerror("Failed to create multi-dimensional array data");
+                free_dimension_info($3); // free dimension info
             }
-            // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
+            // // init with 0
+            // if (strcmp($1, "int") == 0) {
+            //     // int array[$4];
+            //     int *array = (int *)calloc($4, sizeof(int));
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
+            //     // float array[$4];
+            //     float *array = (float *)calloc($4, sizeof(float));
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "bool") == 0) {
+            //     // bool array[$4];
+            //     bool *array = (bool *)calloc($4, sizeof(bool));
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
+            //     // char array[$4];
+            //     char **array = (char **)calloc($4, sizeof(char *));
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // }
+            // // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
         }
     }
-    | type_specifier ID DELIM_LBRACK INT DELIM_RBRACK OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
-        // arrays with initialization values
-        // printf("Array declaration with initialization: type=%s, name=%s, size=%d\n", $1, $2, $4); // for debugging
-
+    | type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
         if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
+            free_dimension_info($3); // free dimension info
         } else {
-            // init array with initialization values
-            if (strcmp($1, "int") == 0) {
-                // int array[$4];
-                int *array = (int *)calloc($4, sizeof(int));
-                int *arr = (int *)array;
-                int i = 0;
-                Node *init = $8;
-                while (init != NULL && i < $4) {
-                    arr[i++] = *(int *)init->value;
-                    init = init->next;
+            long total_elements = $3->total_elements; // total number of elements in the array
+            int num_inits = count_initializers($6); // Node*
+            if (num_inits > total_elements) {
+                yyerror("Too many initializers for array");
+                free_dimension_info($3); // free dimension info
+            } else {
+                void *arr_data = create_md_array_data($1, $3);
+                if (arr_data) {
+                    initialize_md_array_data(arr_data, $1, $3, $6);
+                    insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
+                } else {
+                    yyerror("Failed to create multi-dimensional array data");
+                    free_dimension_info($3); // free dimension info
                 }
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
-                // float array[$4];
-                float *array = (float *)calloc($4, sizeof(float));
-                float *arr = (float *)array;
-                int i = 0;
-                Node *init = $8;
-                while (init != NULL && i < $4) {
-                    arr[i++] = *(float *)init->value;
-                    init = init->next;
+                // last, free array_initializer list
+                Node *curr = $6, *next_node;
+                while (curr) {
+                    next_node = curr->next;
+                    if (curr->value) {
+                        free(curr->value);
+                    }
+                    free(curr);
+                    curr = next_node;
                 }
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "bool") == 0) {
-                // bool array[$4];
-                bool *array = (bool *)calloc($4, sizeof(bool));
-                bool *arr = (bool *)array;
-                int i = 0;
-                Node *init = $8;
-                while (init != NULL && i < $4) {
-                    arr[i++] = *(bool *)init->value;
-                    init = init->next;
-                }
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
-                // char array[$4];
-                char **array = (char **)calloc($4, sizeof(char *));
-                char **arr = (char **)array;
-                int i = 0;
-                Node *init = $8;
-                while (init != NULL && i < $4) {
-                    arr[i++] = strdup((char *)init->value);
-                    init = init->next;
-                }
-                insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
             }
-            // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
+
+
+            // // init array with initialization values
+            // if (strcmp($1, "int") == 0) {
+            //     // int array[$4];
+            //     int *array = (int *)calloc($4, sizeof(int));
+            //     int *arr = (int *)array;
+            //     int i = 0;
+            //     Node *init = $8;
+            //     while (init != NULL && i < $4) {
+            //         arr[i++] = *(int *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
+            //     // float array[$4];
+            //     float *array = (float *)calloc($4, sizeof(float));
+            //     float *arr = (float *)array;
+            //     int i = 0;
+            //     Node *init = $8;
+            //     while (init != NULL && i < $4) {
+            //         arr[i++] = *(float *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "bool") == 0) {
+            //     // bool array[$4];
+            //     bool *array = (bool *)calloc($4, sizeof(bool));
+            //     bool *arr = (bool *)array;
+            //     int i = 0;
+            //     Node *init = $8;
+            //     while (init != NULL && i < $4) {
+            //         arr[i++] = *(bool *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
+            //     // char array[$4];
+            //     char **array = (char **)calloc($4, sizeof(char *));
+            //     char **arr = (char **)array;
+            //     int i = 0;
+            //     Node *init = $8;
+            //     while (init != NULL && i < $4) {
+            //         arr[i++] = strdup((char *)init->value);
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
+            // }
+            // // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
         }
     }
-    | KW_CONST type_specifier ID DELIM_LBRACK INT DELIM_RBRACK OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
-        // const array declaration with initialization values
-        // printf("Const array declaration with initialization: type=%s, name=%s, size=%d\n", $2, $3, $5); // for debugging
-
+    | KW_CONST type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
         if (lookupSymbolInCurrentTable(currentTable, $3)) {
             yyerror("Duplicate declaration of array");
+            free_dimension_info($4); // free dimension info
         } else {
-            // init array with initialization values
-            if (strcmp($2, "int") == 0) {
-                // int array[$5];
-                int *array = (int *)calloc($5, sizeof(int));
-                int *arr = (int *)array;
-                int i = 0;
-                Node *init = $9;
-                while (init != NULL && i < $5) {
-                    arr[i++] = *(int *)init->value;
-                    init = init->next;
+            long total_elements = $4->total_elements;
+            int num_inits = count_initializers($7);
+            if (num_inits > total_elements) {
+                yyerror("Too many initializers for const array");
+                free_dimension_info($4); // free dimension info
+            } else {
+                void *arr_data = create_md_array_data($2, $4);
+                if (arr_data) {
+                    initialize_md_array_data(arr_data, $2, $4, $7);
+                    insertSymbol(currentTable, $3, $2, 1, 1, $4, arr_data); // set as const
+                } else {
+                    yyerror("Failed to create multi-dimensional const array data");
+                    free_dimension_info($4); // free dimension info
                 }
-                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            } else if (strcmp($2, "float") == 0 || strcmp($2, "double") == 0) {
-                // float array[$5];
-                float *array = (float *)calloc($5, sizeof(float));
-                float *arr = (float *)array;
-                int i = 0;
-                Node *init = $9;
-                while (init != NULL && i < $5) {
-                    arr[i++] = *(float *)init->value;
-                    init = init->next;
+                // free array_initializer list
+                Node *curr = $7, *next_node;
+                while (curr) {
+                    next_node = curr->next;
+                    if (curr->value) {
+                        free(curr->value);
+                    }
+                    free(curr);
+                    curr = next_node;
                 }
-                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            } else if (strcmp($2, "bool") == 0) {
-                // bool array[$5];
-                bool *array = (bool *)calloc($5, sizeof(bool));
-                bool *arr = (bool *)array;
-                int i = 0;
-                Node *init = $9;
-                while (init != NULL && i < $5) {
-                    arr[i++] = *(bool *)init->value;
-                    init = init->next;
-                }
-                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            } else if (strcmp($2, "char") == 0 || strcmp($2, "string") == 0) {
-                // char array[$5];
-                char **array = (char **)calloc($5, sizeof(char *));
-                char **arr = (char **)array;
-                int i = 0;
-                Node *init = $9;
-                while (init != NULL && i < $5) {
-                    arr[i++] = strdup((char *)init->value);
-                    init = init->next;
-                }
-                insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
             }
-            // printf("Declared const array: %s, size=%d\n", $3, $5); // for debugging
+
+            // // init array with initialization values
+            // if (strcmp($2, "int") == 0) {
+            //     // int array[$5];
+            //     int *array = (int *)calloc($5, sizeof(int));
+            //     int *arr = (int *)array;
+            //     int i = 0;
+            //     Node *init = $9;
+            //     while (init != NULL && i < $5) {
+            //         arr[i++] = *(int *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            // } else if (strcmp($2, "float") == 0 || strcmp($2, "double") == 0) {
+            //     // float array[$5];
+            //     float *array = (float *)calloc($5, sizeof(float));
+            //     float *arr = (float *)array;
+            //     int i = 0;
+            //     Node *init = $9;
+            //     while (init != NULL && i < $5) {
+            //         arr[i++] = *(float *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            // } else if (strcmp($2, "bool") == 0) {
+            //     // bool array[$5];
+            //     bool *array = (bool *)calloc($5, sizeof(bool));
+            //     bool *arr = (bool *)array;
+            //     int i = 0;
+            //     Node *init = $9;
+            //     while (init != NULL && i < $5) {
+            //         arr[i++] = *(bool *)init->value;
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            // } else if (strcmp($2, "char") == 0 || strcmp($2, "string") == 0) {
+            //     // char array[$5];
+            //     char **array = (char **)calloc($5, sizeof(char *));
+            //     char **arr = (char **)array;
+            //     int i = 0;
+            //     Node *init = $9;
+            //     while (init != NULL && i < $5) {
+            //         arr[i++] = strdup((char *)init->value);
+            //         init = init->next;
+            //     }
+            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
+            // }
+            // // printf("Declared const array: %s, size=%d\n", $3, $5); // for debugging
         }
     }
-    | KW_CONST type_specifier ID DELIM_LBRACK INT DELIM_RBRACK DELIM_SEMICOLON {
+    | KW_CONST type_specifier ID dimension_specifiers DELIM_SEMICOLON {
         // const array declaration without initialization (invalid)
         yyerror("Const array must be initialized");
+        free_dimension_info($4); // free dimension info
     }
     ;
 
@@ -321,42 +401,123 @@ array_initializer:
     }
     ;
 
-arithmetic_expression:
-    ID DELIM_LBRACK expression DELIM_RBRACK {
-        Symbol *symbol = lookupSymbol(currentTable, $1);
-        if (!symbol) {
-            yyerror("Variable not declared");
-        } else if (!symbol->isArray) {
-            yyerror("Variable is not an array");
-        } else if (strcmp($3.type, "INT") != 0) {
+array_indices:
+    DELIM_LBRACK expression DELIM_RBRACK {
+        if (strcmp($2.type, "INT") != 0) {
             yyerror("Array index must be an integer");
+            if ($2.value) {
+                free($2.value); // free the value if it was allocated
+            }
+            $$ = NULL; // set to NULL to avoid using uninitialized value
         } else {
-            int index = *(int *)$3.value;
-            if (index < 0 || index >= symbol->arraySize) {
-                yyerror("Array index out of bounds");
-            } else {
-                // get value from array
-                if (strcmp(symbol->type, "int") == 0) {
-                    $$.type = "INT";
-                    $$.value = malloc(sizeof(int));
-                    int *arr = (int *)symbol->value.arrayValue;
-                    *(int *)$$.value = arr[index];
-                } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                    $$.type = "REAL";
-                    $$.value = malloc(sizeof(float));
-                    float *arr = (float *)symbol->value.arrayValue;
-                    *(float *)$$.value = arr[index];
-                } else if (strcmp(symbol->type, "bool") == 0) {
-                    $$.type = "BOOL";
-                    $$.value = malloc(sizeof(bool));
-                    bool *arr = (bool *)symbol->value.arrayValue;
-                    *(bool *)$$.value = arr[index];
-                } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
-                    $$.type = "STRING";
-                    $$.value = malloc(sizeof(char *));
-                    char **arr = (char **)symbol->value.arrayValue;
-                    *(char **)$$.value = strdup(arr[index]);
+            $$ = (IndexAccessInfo *)malloc(sizeof(IndexAccessInfo));
+            if (!$$) {
+                yyerror("Memory allocation failed for array index access info");
+                if ($2.value) {
+                    free($2.value); // free the value if it was allocated
                 }
+            }
+            $$->num_indices = 1; // single index
+            $$->indices = (int *)malloc(sizeof(int));
+            if (!$$->indices) {
+                yyerror("Memory allocation failed for indices array");
+                free($$); // free the IndexAccessInfo struct
+                if ($2.value) {
+                    free($2.value); // free the value if it was allocated
+                }
+            }
+            $$->indices[0] = *(int *)$2.value; // store the index value
+            free($2.value); // free the value after using it
+        }
+    }
+    | array_indices DELIM_LBRACK expression DELIM_RBRACK {
+        if (!$1) { // Error in preceding part of index list
+            if ($3.value) free($3.value);
+            $$ = NULL;
+            YYERROR; // Propagate error
+        } else if (strcmp($3.type, "INT") != 0) {
+            yyerror("Array index must be an integer expression");
+            if ($3.value) free($3.value);
+            // Clean up $1
+            free($1->indices);
+            free($1);
+            $$ = NULL;
+            YYERROR;
+        } else {
+            int new_num_indices = $1->num_indices + 1;
+            int *new_indices_ptr = (int *)realloc($1->indices, new_num_indices * sizeof(int));
+            if (!new_indices_ptr) {
+                yyerror("Memory reallocation failed for indices array");
+                if ($3.value) free($3.value);
+                free($1->indices); // Free old indices
+                free($1);          // Free the IndexAccessInfo struct
+                $$ = NULL;
+                YYABORT; // Critical error
+            }
+            $1->indices = new_indices_ptr;
+            $1->num_indices = new_num_indices;
+            $1->indices[$1->num_indices - 1] = *(int *)$3.value;
+            $$ = $1; // Pass along the extended list
+            free($3.value); // Value consumed
+        }
+    }
+    ;
+
+arithmetic_expression:
+    ID array_indices {
+        // array access
+        $$ = default_expr_error_value();
+        if (!$2) {
+            yyerror("Invalid array access indices");
+        } else {
+            Symbol *symbol = lookupSymbol(currentTable, $1);
+            if (symbol == NULL) {
+                yyerror("Undefined array variable");
+            } else if (!symbol->isArray) {
+                yyerror("Variable is not an array");
+            } else if (symbol->dimensions->num_dimensions != $2->num_indices) {
+                yyerror("Incorrect number of dimensions for array");
+            } else {
+                // bounds check
+                bool bounds_ok = true;
+                for (int i = 0; i < $2->num_indices; ++i) {
+                    if ($2->indices[i] < 0 || $2->indices[i] >= symbol->dimensions->sizes[i]) {
+                        yyerror("Array index out of bounds");
+                        bounds_ok = false;
+                        break;
+                    }
+                }
+
+                if (bounds_ok) {
+                    void *element_ptr = get_md_array_element_ptr(symbol, $2);
+                    if (element_ptr) {
+                        if (strcmp(symbol->type, "int") == 0) {
+                            $$.type = "INT";
+                            $$.value = malloc(sizeof(int));
+                            *(int *)$$.value = *(int *)element_ptr;
+                        } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+                            $$.type = "REAL";
+                            $$.value = malloc(sizeof(float));
+                            *(float *)$$.value = *(float *)element_ptr;
+                        } else if (strcmp(symbol->type, "bool") == 0) {
+                            $$.type = "BOOL";
+                            $$.value = malloc(sizeof(bool));
+                            *(bool *)$$.value = *(bool *)element_ptr;
+                        } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
+                            $$.type = "STRING";
+                            $$.value = strdup(*(char **)element_ptr);
+                        } else {
+                            yyerror("Unsupported array type");
+                        }
+                    } else {
+                        yyerror("Failed to access array element");
+                    }
+                }
+            }
+            // clean up IndexAccessInfo
+            if ($2) {
+                free($2->indices);
+                free($2);
             }
         }
     }
@@ -372,7 +533,9 @@ arithmetic_expression:
             *(float *)$$.value = -(*(float *)$2.value);
         } else {
             yyerror("Invalid type for unary minus");
+            $$ = default_expr_error_value(); // Set to error value
         }
+        if ($2.value) free($2.value); // Free operand value
     }
     | expression OP_INC {
         // Increment
@@ -386,7 +549,9 @@ arithmetic_expression:
             *(float *)$$.value = (*(float *)$1.value) + 1.0;
         } else {
             yyerror("Invalid type for increment");
+            $$ = default_expr_error_value(); // Set to error value
         }
+        if ($1.value) free($1.value); // Free operand value
     }
     | expression OP_DEC {
         // Decrement
@@ -400,10 +565,13 @@ arithmetic_expression:
             *(float *)$$.value = (*(float *)$1.value) - 1.0;
         } else {
             yyerror("Invalid type for decrement");
+            $$ = default_expr_error_value(); // Set to error value
         }
+        if ($1.value) free($1.value); // Free operand value
     }
     | expression OP_MUL expression {
         // Multiplication
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -412,38 +580,62 @@ arithmetic_expression:
                    (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
             $$.type = "REAL";
             $$.value = malloc(sizeof(float));
-            *(float *)$$.value = (*(float *)$1.value) * (*(float *)$3.value);
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(float *)$$.value = val1 * val2;
         } else {
             yyerror("Type mismatch in multiplication");
         }
+        if ($1.value) free($1.value); // Free operand values
+        if ($3.value) free($3.value);
     }
     | expression OP_DIV expression {
         // Division
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            $$.type = "INT";
-            $$.value = malloc(sizeof(int));
-            *(int *)$$.value = (*(int *)$1.value) / (*(int *)$3.value);
+            if (*(int *)$3.value == 0) {
+                yyerror("Division by zero (integer)");
+            } else {
+                $$.type = "INT";
+                $$.value = malloc(sizeof(int));
+                *(int *)$$.value = (*(int *)$1.value) / (*(int *)$3.value);
+            }
         } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
                    (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            $$.type = "REAL";
-            $$.value = malloc(sizeof(float));
-            *(float *)$$.value = (*(float *)$1.value) / (*(float *)$3.value);
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            if (val2 == 0.0) {
+                yyerror("Division by zero (float)");
+            } else {
+                $$.type = "REAL";
+                $$.value = malloc(sizeof(float));
+                *(float *)$$.value = val1 / val2;
+            }
         } else {
             yyerror("Type mismatch in division");
         }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_MOD expression {
         // Modulus
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            $$.type = "INT";
-            $$.value = malloc(sizeof(int));
-            *(int *)$$.value = (*(int *)$1.value) % (*(int *)$3.value);
+            if (*(int *)$3.value == 0) {
+                yyerror("Modulus by zero");
+            } else {
+                $$.type = "INT";
+                $$.value = malloc(sizeof(int));
+                *(int *)$$.value = (*(int *)$1.value) % (*(int *)$3.value);
+            }
         } else {
             yyerror("Type mismatch in modulus");
         }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_ADD expression {
         // Addition
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -452,15 +644,27 @@ arithmetic_expression:
                    (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
             $$.type = "REAL";
             $$.value = malloc(sizeof(float));
-            float left = (strcmp($1.type, "REAL") == 0) ? *(float *)$1.value : (float)(*(int *)$1.value);
-            float right = (strcmp($3.type, "REAL") == 0) ? *(float *)$3.value : (float)(*(int *)$3.value);
+            float left = (strcmp($1.type, "INT") == 0) ? (float)(*(int *)$1.value) : (*(float *)$1.value);
+            float right = (strcmp($3.type, "INT") == 0) ? (float)(*(int *)$3.value) : (*(float *)$3.value);
             *(float *)$$.value = left + right;
-        } else {
+        } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
+            // String concatenation
+            $$.type = "STRING";
+            char *s1 = (char*)$1.value;
+            char *s2 = (char*)$3.value;
+            $$.value = malloc(strlen(s1) + strlen(s2) + 1);
+            strcpy((char*)$$.value, s1);
+            strcat((char*)$$.value, s2);
+        }
+         else {
             yyerror("Type mismatch in addition");
         }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_SUB expression {
         // Subtraction
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -469,95 +673,138 @@ arithmetic_expression:
                    (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
             $$.type = "REAL";
             $$.value = malloc(sizeof(float));
-            *(float *)$$.value = (*(float *)$1.value) - (*(float *)$3.value);
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(float *)$$.value = val1 - val2;
         } else {
             yyerror("Type mismatch in subtraction");
         }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_LT expression {
         // Less than
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) < (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) < (*(float *)$3.value);
-        } else {
-            yyerror("Type mismatch in less than comparison");
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 < val2;
+        } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) < 0;
         }
+        else {
+            yyerror("Type mismatch in less than comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_LEQ expression {
         // Less than or equal to
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) <= (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) <= (*(float *)$3.value);
-        } else {
-            yyerror("Type mismatch in less than or equal to comparison");
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 <= val2;
+        } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) <= 0;
         }
+        else {
+            yyerror("Type mismatch in less equal comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_EQ expression {
         // Equal to
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) == (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) == (*(float *)$3.value);
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 == val2;
         } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
-            *(bool *)$$.value = strcmp((char *)$1.value, (char *)$3.value) == 0;
-        } else {
-            yyerror("Type mismatch in equal to comparison");
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) == 0;
         }
+        else {
+            yyerror("Type mismatch in equal comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_GEQ expression {
         // Greater than or equal to
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) >= (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) >= (*(float *)$3.value);
-        } else {
-            yyerror("Type mismatch in greater than or equal to comparison");
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 >= val2;
+        } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) >= 0;
         }
+        else {
+            yyerror("Type mismatch in greater equal comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_GT expression {
         // Greater than
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) > (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) > (*(float *)$3.value);
-        } else {
-            yyerror("Type mismatch in greater than comparison");
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 > val2;
+        } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) > 0;
         }
+        else {
+            yyerror("Type mismatch in greater than comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | expression OP_NEQ expression {
         // Not equal to
-        $$.type = "BOOL";
+        $$ = default_expr_error_value();
+        $$.type = "BOOL"; // Result is always BOOL
         $$.value = malloc(sizeof(bool));
-        if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
-            *(bool *)$$.value = (*(int *)$1.value) != (*(int *)$3.value);
-        } else if ((strcmp($1.type, "REAL") == 0 || strcmp($1.type, "INT") == 0) &&
-                   (strcmp($3.type, "REAL") == 0 || strcmp($3.type, "INT") == 0)) {
-            *(bool *)$$.value = (*(float *)$1.value) != (*(float *)$3.value);
+        if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
+            (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
+            float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
+            *(bool *)$$.value = val1 != val2;
         } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
-            *(bool *)$$.value = strcmp((char *)$1.value, (char *)$3.value) != 0;
-        } else {
-            yyerror("Type mismatch in not equal to comparison");
+             *(bool *)$$.value = strcmp((char*)$1.value, (char*)$3.value) != 0;
         }
+        else {
+            yyerror("Type mismatch in not equal comparison");
+            *(bool *)$$.value = false; // Default on error
+        }
+        if ($1.value) free($1.value);
+        if ($3.value) free($3.value);
     }
     | OP_NOT expression {
         // Logical NOT
+        $$ = default_expr_error_value();
         if (strcmp($2.type, "BOOL") == 0) {
             $$.type = "BOOL";
             $$.value = malloc(sizeof(bool));
@@ -565,9 +812,11 @@ arithmetic_expression:
         } else {
             yyerror("Invalid type for logical NOT");
         }
+        if ($2.value) free($2.value); // Free operand value
     }
     | expression OP_AND expression {
         // Logical AND
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "BOOL") == 0 && strcmp($3.type, "BOOL") == 0) {
             $$.type = "BOOL";
             $$.value = malloc(sizeof(bool));
@@ -575,9 +824,12 @@ arithmetic_expression:
         } else {
             yyerror("Type mismatch in logical AND");
         }
+        if ($1.value) free($1.value); // Free operand values
+        if ($3.value) free($3.value);
     }
     | expression OP_OR expression {
         // Logical OR
+        $$ = default_expr_error_value();
         if (strcmp($1.type, "BOOL") == 0 && strcmp($3.type, "BOOL") == 0) {
             $$.type = "BOOL";
             $$.value = malloc(sizeof(bool));
@@ -585,12 +837,15 @@ arithmetic_expression:
         } else {
             yyerror("Type mismatch in logical OR");
         }
+        if ($1.value) free($1.value); // Free operand values
+        if ($3.value) free($3.value);
     }
     | DELIM_LPAR expression DELIM_RPAR {
         // Parentheses
         $$.type = $2.type;
         $$.value = $2.value;
     }
+    ;
 
 expression:
     INT {
@@ -620,8 +875,10 @@ expression:
         Symbol *symbol = lookupSymbol(currentTable, $1);
         if (!symbol) {
             yyerror("Variable not declared");
+            $$ = default_expr_error_value(); // Set to error value
         } else if (symbol->isArray) {
             yyerror("Need specify index for array variable");
+            $$ = default_expr_error_value(); // Set to error value
         } else {
             if (strcmp(symbol->type, "int") == 0) {
                 $$.type = "INT";
@@ -646,6 +903,7 @@ expression:
         // void function(procedure) has no return value
         if (strcmp($1.type, "void") == 0) {
             yyerror("Void function cannot be used in expression");
+            $$ = default_expr_error_value(); // Set to error value
         } else {
             if (strcmp($1.type, "int") == 0) {
                 $$.type = "INT";
@@ -708,9 +966,7 @@ statement:
     | conditional
     | loop
     | return_statement
-    
     | declaration
-    | array_declaration
     ;
 
 block:
@@ -1082,7 +1338,7 @@ function_declaration:
         // add all arguments to the symbol table
         Parameter *param = $4;
         while (param != NULL) {
-            insertSymbol(currentTable, param->name, param->type, 0, NULL, 0, 0);
+            insertSymbol(currentTable, param->name, param->type, 0, 0, NULL, NULL);
             param = param->next;
         }
     }
@@ -1136,7 +1392,7 @@ function_declaration:
         // add all arguments to the symbol table
         Parameter *param = $4;
         while (param != NULL) {
-            insertSymbol(currentTable, param->name, param->type, 0, NULL, 0, 0);
+            insertSymbol(currentTable, param->name, param->type, 0, 0, NULL, NULL);
             param = param->next;
         }
     }
@@ -1180,6 +1436,7 @@ parameter_list:
 function_invocation:    //TODO: fix parameter calling and call-by-value
     ID DELIM_LPAR parameter_list DELIM_RPAR {
         // check if the function is declared
+        $$ = default_expr_error_value();
         Function *func = lookupFunction(functionTable, $1);
         if (!func) {
             yyerror("Function not declared");

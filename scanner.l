@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "expr_value.h"
 #include "symbol_table.h"
 #include "function_table.h"
 #include "y.tab.h" // for token return by yacc
