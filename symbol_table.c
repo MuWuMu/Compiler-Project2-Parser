@@ -17,7 +17,7 @@ SymbolTable* createSymbolTable(SymbolTable *parent) {
         table->table[i] = NULL;
     }
     table->parent = parent;
-    printf("Create new symbol table\n"); // for debugging
+    // printf("Create new symbol table\n"); // for debugging
     return table;
 }
 
@@ -164,77 +164,33 @@ void dumpSymbolTable(SymbolTable *table) {
         if (symbol) {
             while (symbol != NULL) {
                 printf(" Name: %s, Type: %s", symbol->name, symbol->type);
-                if (symbol->isConst)
+                if (symbol->isConst) {
                     printf("(const)");
+                }
+
                 if (symbol->isArray) {
-                    printf(", Array dimensions: [");
-                    if (symbol->dimensions) {
-                        for (int d = 0; d < symbol->dimensions->num_dimensions; d++) {
-                            printf("%d", symbol->dimensions->sizes[d]);
-                            if (d < symbol->dimensions->num_dimensions - 1) printf("][");
-                        }
-                    }
-                    printf("], total elements: %ld\n", symbol->dimensions ? symbol->dimensions->total_elements : 0);
-                    // TODO: Actual printing data
+                    printf("\n"); // Array: just print name, type, and (const) if applicable, then newline
                 } else {
+                    // Non-array symbol
                     if (symbol->isConst) {
-                        printf(", Value: ");
-                        if (strcmp(symbol->type, "bool") == 0) {
-                            printf("%s\n", symbol->value.boolValue ? "true" : "false");
-                        } else if (strcmp(symbol->type, "int") == 0) {
-                            printf("%d\n", symbol->value.intValue);
-                        } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                            printf("%f\n", symbol->value.realValue);
-                        } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
-                            printf("%s\n", symbol->value.stringValue);
-                        }
+                        // printf(", Value: ");
+                        // if (strcmp(symbol->type, "bool") == 0) {
+                        //     printf("%s\n", symbol->value.boolValue ? "true" : "false");
+                        // } else if (strcmp(symbol->type, "int") == 0) {
+                        //     printf("%d\n", symbol->value.intValue);
+                        // } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+                        //     printf("%f\n", symbol->value.realValue);
+                        // } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
+                        //     printf("%s\n", symbol->value.stringValue ? symbol->value.stringValue : "(null)");
+                        // } else {
+                        //     printf("(unknown type)\n");
+                        // }
                     } else {
-                        printf("\n");
+                        printf("\n"); // Non-const, non-array variable, just print its name and type, then newline
                     }
                 }
                 symbol = symbol->next;
             }
         }
-    
-
-        // while (symbol != NULL) {
-        //     if (symbol->isConst) {
-        //         if (symbol->isArray) {
-        //             // const array
-        //             printf("Name: %s, Type: const %s, Array size: %d, Values: {", 
-        //                     symbol->name, symbol->type, symbol->arraySize);
-        //             int *array = (int *)symbol->value.arrayValue;
-        //             for (int j = 0; j < symbol->arraySize; j++) {
-        //             printf("%d", array[j]);
-        //             if (j < symbol->arraySize - 1) {
-        //                 printf(", ");
-        //             }
-        //         }
-        //         printf("}\n");
-        //         } else {
-        //             // const value
-        //             printf("Name: %s, Type: const %s, Value: ", symbol->name, symbol->type);
-        //             if (strcmp(symbol->type, "bool") == 0) {
-        //                 printf("%s\n", symbol->value.boolValue ? "true" : "false");
-        //             } else if (strcmp(symbol->type, "int") == 0) {
-        //                 printf("%d\n", symbol->value.intValue);
-        //             } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-        //                 printf("%f\n", symbol->value.realValue);
-        //             } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
-        //                 printf("%s\n", symbol->value.stringValue);
-        //             }
-        //         }
-        //     } else {
-        //         if (symbol->isArray) {
-        //             // non-const array
-        //             printf("Name: %s, Type: %s, Array size: %d\n", 
-        //                 symbol->name, symbol->type, symbol->arraySize);
-        //         } else {
-        //             // Non-const variable
-        //             printf("Name: %s, Type: %s\n", symbol->name, symbol->type);
-        //         }
-        //     }
-        //     symbol = symbol->next;
-        // }
     }
 }

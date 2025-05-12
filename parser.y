@@ -36,6 +36,10 @@ void yyerror(const char *s) {
     fprintf(stderr, "Error at line %d: %s\n", linenum, s);
 }
 
+void yywarning(const char *s) {
+    fprintf(stderr, "Warning at line %d: %s\n", linenum, s);
+}
+
 
 %}
 
@@ -187,204 +191,125 @@ declarator_list:
 
 array_declaration:
     type_specifier ID dimension_specifiers DELIM_SEMICOLON {
+        printf("Array declaration without initialization: type=%s\n", $1);    // for debugging
         if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
             free_dimension_info($3); // free dimension info
         } else {
-            void *arr_data = create_md_array_data($1, $3); // $1 is string, $3 is DimensionInfo
-            if (arr_data) {
-                initialize_md_array_data(arr_data, $1, $3, NULL); // NULL to default init
-                insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
-            } else {
-                yyerror("Failed to create multi-dimensional array data");
+            insertSymbol(currentTable, $2, $1, 0, 1, $3, NULL); // NULL for no initialization
+            // void *arr_data = create_md_array_data($1, $3); // $1 is string, $3 is DimensionInfo
+            // if (arr_data) {
+            //     initialize_md_array_data(arr_data, $1, $3, NULL); // NULL to default init
+            //     insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
+            // } else {
+            //     yyerror("Failed to create multi-dimensional array data");
+            //     free_dimension_info($3); // free dimension info
+            // }
+            if ($3) {
                 free_dimension_info($3); // free dimension info
             }
-            // // init with 0
-            // if (strcmp($1, "int") == 0) {
-            //     // int array[$4];
-            //     int *array = (int *)calloc($4, sizeof(int));
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
-            //     // float array[$4];
-            //     float *array = (float *)calloc($4, sizeof(float));
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "bool") == 0) {
-            //     // bool array[$4];
-            //     bool *array = (bool *)calloc($4, sizeof(bool));
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
-            //     // char array[$4];
-            //     char **array = (char **)calloc($4, sizeof(char *));
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // }
-            // // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
         }
     }
     | type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
+        printf("Array declaration with initialization: type=%s\n", $1);    // for debugging
         if (lookupSymbolInCurrentTable(currentTable, $2)) {
             yyerror("Duplicate declaration of array");
-            free_dimension_info($3); // free dimension info
         } else {
-            long total_elements = $3->total_elements; // total number of elements in the array
-            int num_inits = count_initializers($6); // Node*
-            if (num_inits > total_elements) {
-                yyerror("Too many initializers for array");
-                free_dimension_info($3); // free dimension info
-            } else {
-                void *arr_data = create_md_array_data($1, $3);
-                if (arr_data) {
-                    initialize_md_array_data(arr_data, $1, $3, $6);
-                    insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
-                } else {
-                    yyerror("Failed to create multi-dimensional array data");
-                    free_dimension_info($3); // free dimension info
-                }
-                // last, free array_initializer list
-                Node *curr = $6, *next_node;
-                while (curr) {
-                    next_node = curr->next;
-                    if (curr->value) {
-                        free(curr->value);
-                    }
-                    free(curr);
-                    curr = next_node;
-                }
-            }
-
-
-            // // init array with initialization values
-            // if (strcmp($1, "int") == 0) {
-            //     // int array[$4];
-            //     int *array = (int *)calloc($4, sizeof(int));
-            //     int *arr = (int *)array;
-            //     int i = 0;
-            //     Node *init = $8;
-            //     while (init != NULL && i < $4) {
-            //         arr[i++] = *(int *)init->value;
-            //         init = init->next;
+            insertSymbol(currentTable, $2, $1, 0, 1, $3, NULL); // NULL for no initialization
+            // long total_elements = $3->total_elements; // total number of elements in the array
+            // int num_inits = count_initializers($6); // Node*
+            // if (num_inits > total_elements) {
+            //     yyerror("Too many initializers for array");
+            //     free_dimension_info($3); // free dimension info
+            // } else {
+            //     void *arr_data = create_md_array_data($1, $3);
+            //     if (arr_data) {
+            //         initialize_md_array_data(arr_data, $1, $3, $6);
+            //         insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
+            //     } else {
+            //         yyerror("Failed to create multi-dimensional array data");
+            //         free_dimension_info($3); // free dimension info
             //     }
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "float") == 0 || strcmp($1, "double") == 0) {
-            //     // float array[$4];
-            //     float *array = (float *)calloc($4, sizeof(float));
-            //     float *arr = (float *)array;
-            //     int i = 0;
-            //     Node *init = $8;
-            //     while (init != NULL && i < $4) {
-            //         arr[i++] = *(float *)init->value;
-            //         init = init->next;
+            //     // last, free array_initializer list
+            //     Node *curr = $6, *next_node;
+            //     while (curr) {
+            //         next_node = curr->next;
+            //         if (curr->value) {
+            //             free(curr->value);
+            //         }
+            //         free(curr);
+            //         curr = next_node;
             //     }
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "bool") == 0) {
-            //     // bool array[$4];
-            //     bool *array = (bool *)calloc($4, sizeof(bool));
-            //     bool *arr = (bool *)array;
-            //     int i = 0;
-            //     Node *init = $8;
-            //     while (init != NULL && i < $4) {
-            //         arr[i++] = *(bool *)init->value;
-            //         init = init->next;
-            //     }
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
-            // } else if (strcmp($1, "char") == 0 || strcmp($1, "string") == 0) {
-            //     // char array[$4];
-            //     char **array = (char **)calloc($4, sizeof(char *));
-            //     char **arr = (char **)array;
-            //     int i = 0;
-            //     Node *init = $8;
-            //     while (init != NULL && i < $4) {
-            //         arr[i++] = strdup((char *)init->value);
-            //         init = init->next;
-            //     }
-            //     insertSymbol(currentTable, $2, $1, 0, array, 1, $4);
             // }
-            // // printf("Declared array: %s, size=%d\n", $2, $4); // for debugging
+        }
+        if ($3) {
+            free_dimension_info($3); // free dimension info
+        }
+
+        // clean array_initializer list
+        Node *curr = $6, *next_node;
+        while (curr != NULL) {
+            next_node = curr->next;
+            if (curr->value) {
+                free(curr->value);
+            }
+            free(curr);
+            curr = next_node;
         }
     }
     | KW_CONST type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
+        printf("Const array declaration with initialization: type=%s\n", $2);    // for debugging
         if (lookupSymbolInCurrentTable(currentTable, $3)) {
             yyerror("Duplicate declaration of array");
-            free_dimension_info($4); // free dimension info
         } else {
-            long total_elements = $4->total_elements;
-            int num_inits = count_initializers($7);
-            if (num_inits > total_elements) {
-                yyerror("Too many initializers for const array");
-                free_dimension_info($4); // free dimension info
-            } else {
-                void *arr_data = create_md_array_data($2, $4);
-                if (arr_data) {
-                    initialize_md_array_data(arr_data, $2, $4, $7);
-                    insertSymbol(currentTable, $3, $2, 1, 1, $4, arr_data); // set as const
-                } else {
-                    yyerror("Failed to create multi-dimensional const array data");
-                    free_dimension_info($4); // free dimension info
-                }
-                // free array_initializer list
-                Node *curr = $7, *next_node;
-                while (curr) {
-                    next_node = curr->next;
-                    if (curr->value) {
-                        free(curr->value);
-                    }
-                    free(curr);
-                    curr = next_node;
-                }
-            }
-
-            // // init array with initialization values
-            // if (strcmp($2, "int") == 0) {
-            //     // int array[$5];
-            //     int *array = (int *)calloc($5, sizeof(int));
-            //     int *arr = (int *)array;
-            //     int i = 0;
-            //     Node *init = $9;
-            //     while (init != NULL && i < $5) {
-            //         arr[i++] = *(int *)init->value;
-            //         init = init->next;
+            insertSymbol(currentTable, $3, $2, 1, 1, $4, NULL); // NULL for no initialization
+            // long total_elements = $4->total_elements;
+            // int num_inits = count_initializers($7);
+            // if (num_inits > total_elements) {
+            //     yyerror("Too many initializers for const array");
+            //     free_dimension_info($4); // free dimension info
+            // } else {
+            //     void *arr_data = create_md_array_data($2, $4);
+            //     if (arr_data) {
+            //         initialize_md_array_data(arr_data, $2, $4, $7);
+            //         insertSymbol(currentTable, $3, $2, 1, 1, $4, arr_data); // set as const
+            //     } else {
+            //         yyerror("Failed to create multi-dimensional const array data");
+            //         free_dimension_info($4); // free dimension info
             //     }
-            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            // } else if (strcmp($2, "float") == 0 || strcmp($2, "double") == 0) {
-            //     // float array[$5];
-            //     float *array = (float *)calloc($5, sizeof(float));
-            //     float *arr = (float *)array;
-            //     int i = 0;
-            //     Node *init = $9;
-            //     while (init != NULL && i < $5) {
-            //         arr[i++] = *(float *)init->value;
-            //         init = init->next;
+            //     // free array_initializer list
+            //     Node *curr = $7, *next_node;
+            //     while (curr) {
+            //         next_node = curr->next;
+            //         if (curr->value) {
+            //             free(curr->value);
+            //         }
+            //         free(curr);
+            //         curr = next_node;
             //     }
-            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            // } else if (strcmp($2, "bool") == 0) {
-            //     // bool array[$5];
-            //     bool *array = (bool *)calloc($5, sizeof(bool));
-            //     bool *arr = (bool *)array;
-            //     int i = 0;
-            //     Node *init = $9;
-            //     while (init != NULL && i < $5) {
-            //         arr[i++] = *(bool *)init->value;
-            //         init = init->next;
-            //     }
-            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
-            // } else if (strcmp($2, "char") == 0 || strcmp($2, "string") == 0) {
-            //     // char array[$5];
-            //     char **array = (char **)calloc($5, sizeof(char *));
-            //     char **arr = (char **)array;
-            //     int i = 0;
-            //     Node *init = $9;
-            //     while (init != NULL && i < $5) {
-            //         arr[i++] = strdup((char *)init->value);
-            //         init = init->next;
-            //     }
-            //     insertSymbol(currentTable, $3, $2, 1, array, 1, $5); // set as const
             // }
-            // // printf("Declared const array: %s, size=%d\n", $3, $5); // for debugging
+        }
+        if ($4) {
+            free_dimension_info($4); // free dimension info
+        }
+
+        // clean array_initializer list
+        Node *curr = $7, *next_node;
+        while (curr != NULL) {
+            next_node = curr->next;
+            if (curr->value) {
+                free(curr->value);
+            }
+            free(curr);
+            curr = next_node;
         }
     }
     | KW_CONST type_specifier ID dimension_specifiers DELIM_SEMICOLON {
         // const array declaration without initialization (invalid)
         yyerror("Const array must be initialized");
-        free_dimension_info($4); // free dimension info
+        if ($4) {
+            free_dimension_info($4); // free dimension info
+        }
     }
     ;
 
@@ -495,19 +420,23 @@ arithmetic_expression:
                     if (element_ptr) {
                         if (strcmp(symbol->type, "int") == 0) {
                             $$.type = "INT";
-                            $$.value = malloc(sizeof(int));
-                            *(int *)$$.value = *(int *)element_ptr;
+                            $$.value = NULL;
+                            // $$.value = malloc(sizeof(int));
+                            // *(int *)$$.value = *(int *)element_ptr;
                         } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
                             $$.type = "REAL";
-                            $$.value = malloc(sizeof(float));
-                            *(float *)$$.value = *(float *)element_ptr;
+                            $$.value = NULL;
+                            // $$.value = malloc(sizeof(float));
+                            // *(float *)$$.value = *(float *)element_ptr;
                         } else if (strcmp(symbol->type, "bool") == 0) {
                             $$.type = "BOOL";
-                            $$.value = malloc(sizeof(bool));
-                            *(bool *)$$.value = *(bool *)element_ptr;
+                            $$.value = NULL;
+                            // $$.value = malloc(sizeof(bool));
+                            // *(bool *)$$.value = *(bool *)element_ptr;
                         } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
                             $$.type = "STRING";
-                            $$.value = strdup(*(char **)element_ptr);
+                            $$.value = NULL;
+                            // $$.value = strdup(*(char **)element_ptr);
                         } else {
                             yyerror("Unsupported array type");
                         }
@@ -574,6 +503,7 @@ arithmetic_expression:
     | expression OP_MUL expression {
         // Multiplication
         $$ = default_expr_error_value();
+        bool mixed_types_numeric = false;
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -585,6 +515,15 @@ arithmetic_expression:
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(float *)$$.value = val1 * val2;
+
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+                mixed_types_numeric = true;
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+                mixed_types_numeric = true;
+            }
+
         } else {
             yyerror("Type mismatch in multiplication");
         }
@@ -594,6 +533,7 @@ arithmetic_expression:
     | expression OP_DIV expression {
         // Division
         $$ = default_expr_error_value();
+        bool mixed_types_numeric = false;
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             if (*(int *)$3.value == 0) {
                 yyerror("Division by zero (integer)");
@@ -613,6 +553,15 @@ arithmetic_expression:
                 $$.value = malloc(sizeof(float));
                 *(float *)$$.value = val1 / val2;
             }
+
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+                mixed_types_numeric = true;
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+                mixed_types_numeric = true;
+            }
+
         } else {
             yyerror("Type mismatch in division");
         }
@@ -638,6 +587,7 @@ arithmetic_expression:
     | expression OP_ADD expression {
         // Addition
         $$ = default_expr_error_value();
+        bool mixed_types_numeric = false;
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -649,6 +599,15 @@ arithmetic_expression:
             float left = (strcmp($1.type, "INT") == 0) ? (float)(*(int *)$1.value) : (*(float *)$1.value);
             float right = (strcmp($3.type, "INT") == 0) ? (float)(*(int *)$3.value) : (*(float *)$3.value);
             *(float *)$$.value = left + right;
+
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+                mixed_types_numeric = true;
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+                mixed_types_numeric = true;
+            }
+
         } else if (strcmp($1.type, "STRING") == 0 && strcmp($3.type, "STRING") == 0) {
             // String concatenation
             $$.type = "STRING";
@@ -667,6 +626,7 @@ arithmetic_expression:
     | expression OP_SUB expression {
         // Subtraction
         $$ = default_expr_error_value();
+        bool mixed_types_numeric = false;
         if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "INT") == 0) {
             $$.type = "INT";
             $$.value = malloc(sizeof(int));
@@ -678,6 +638,15 @@ arithmetic_expression:
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(float *)$$.value = val1 - val2;
+
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+                mixed_types_numeric = true;
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+                mixed_types_numeric = true;
+            }
+            
         } else {
             yyerror("Type mismatch in subtraction");
         }
@@ -691,6 +660,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 < val2;
@@ -711,6 +686,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 <= val2;
@@ -731,6 +712,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 == val2;
@@ -751,6 +738,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 >= val2;
@@ -771,6 +764,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 > val2;
@@ -791,6 +790,12 @@ arithmetic_expression:
         $$.value = malloc(sizeof(bool));
         if ((strcmp($1.type, "INT") == 0 || strcmp($1.type, "REAL") == 0) &&
             (strcmp($3.type, "INT") == 0 || strcmp($3.type, "REAL") == 0)) {
+            // Warning
+            if (strcmp($1.type, "INT") == 0 && strcmp($3.type, "REAL") == 0) {
+                yywarning("Implicit conversion from int to real in addition (left operand).");
+            } else if (strcmp($1.type, "REAL") == 0 && strcmp($3.type, "INT") == 0) {
+                yywarning("Implicit conversion from int to real in addition (right operand).");
+            }
             float val1 = (strcmp($1.type, "INT") == 0) ? (float)(*(int*)$1.value) : (*(float*)$1.value);
             float val2 = (strcmp($3.type, "INT") == 0) ? (float)(*(int*)$3.value) : (*(float*)$3.value);
             *(bool *)$$.value = val1 != val2;
@@ -912,19 +917,23 @@ expression:
         } else {
             if (strcmp($1.type, "int") == 0) {
                 $$.type = "INT";
-                $$.value = malloc(sizeof(int));
-                *(int *)$$.value = *(int *)$1.value;
+                $$.value = NULL;
+                // $$.value = malloc(sizeof(int));
+                // *(int *)$$.value = *(int *)$1.value;
             } else if (strcmp($1.type, "float") == 0 || strcmp($1.type, "double") == 0) {
                 $$.type = "REAL";
-                $$.value = malloc(sizeof(float));
-                *(float *)$$.value = *(float *)$1.value;
+                $$.value = NULL;
+                // $$.value = malloc(sizeof(float));
+                // *(float *)$$.value = *(float *)$1.value;
             } else if (strcmp($1.type, "bool") == 0) {
                 $$.type = "BOOL";
-                $$.value = malloc(sizeof(bool));
-                *(bool *)$$.value = *(bool *)$1.value;
+                $$.value = NULL;
+                // $$.value = malloc(sizeof(bool));
+                // *(bool *)$$.value = *(bool *)$1.value;
             } else if (strcmp($1.type, "string") == 0 || strcmp($1.type, "char") == 0) {
                 $$.type = "STRING";
-                $$.value = strdup((char *)$1.value);
+                $$.value = NULL;
+                // $$.value = strdup((char *)$1.value);
             } else {
                 yyerror("Invalid function return type");
                 $$ = default_expr_error_value(); // Set to error value
@@ -944,24 +953,46 @@ assignment:
         } else if (symbol->isConst) {
             yyerror("Cannot assign to a constant variable");
         } else {
+            bool type_match_exact = false;
+            bool type_compatible_with_warning = false;
+
             // check if the type of the variable matches the type of the expression
             if (strcmp(symbol->type, "int") == 0 && strcmp($3.type, "INT") == 0) {
                 // // int to int assignment
+                type_match_exact = true;
                 // symbol->value.intValue = *(int *)$3.value;
             } else if ((strcmp(symbol->type, "float") == 0) || (strcmp(symbol->type, "double") == 0) && strcmp($3.type, "REAL") == 0) {
                 // // float to float assignment
+                type_match_exact = true;
                 // symbol->value.realValue = *(float *)$3.value;
             } else if (strcmp(symbol->type, "bool") == 0 && strcmp($3.type, "BOOL") == 0) {
                 // // bool to bool assignment
+                type_match_exact = true;
                 // symbol->value.boolValue = *(bool *)$3.value;
             } else if ((strcmp(symbol->type, "char") == 0) || (strcmp(symbol->type, "string") == 0) && strcmp($3.type, "STRING") == 0) {
                 // // string to string assignment
+                type_match_exact = true;
                 // free(symbol->value.stringValue); // free old value
                 // symbol->value.stringValue = strdup((char *)$3.value);
-            } else {
-                yyerror("Type mismatch in assignment");
+            } 
+            else if ((strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) && strcmp($3.type, "INT") == 0) {
+                // Assigning int to float/double
+                type_compatible_with_warning = true;
+                yywarning("Implicit conversion from int to float/double in assignment");
+                // symbol->value.realValue = (float)(*(int *)$3.value);
+            } else if (strcmp(symbol->type, "int") == 0 && strcmp($3.type, "REAL") == 0) {
+                // Assigning float/double to int
+                type_compatible_with_warning = true;
+                yywarning("Implicit conversion from float/double to int in assignment (May cause data loss)");
+                // symbol->value.realValue = *(float *)$3.value;
             }
-        free($3.value); // release value of expression
+            
+            if (!type_match_exact && !type_compatible_with_warning) {
+                yyerror("Type mismatch in assignment");
+            } 
+            
+        if ($3.value)
+            free($3.value); // release value of expression
         }
     }
     ;
@@ -1207,7 +1238,7 @@ loop:
             yyerror("Invalid type for while condition");
         }
     }
-    | KW_FOR DELIM_LPAR simple DELIM_COMMA expression DELIM_COMMA simple DELIM_RPAR simple {
+    | KW_FOR DELIM_LPAR simple DELIM_SEMICOLON expression DELIM_SEMICOLON simple DELIM_RPAR simple {
         // printf("For statement\n"); // for debugging
         if (strcmp($5.type, "BOOL") == 0) {
             // while (*(bool *)$5.value) {
@@ -1217,7 +1248,7 @@ loop:
             yyerror("Invalid type for for condition");
         }
     }
-    | KW_FOR DELIM_LPAR simple DELIM_COMMA expression DELIM_COMMA simple DELIM_RPAR block {
+    | KW_FOR DELIM_LPAR simple DELIM_SEMICOLON expression DELIM_SEMICOLON simple DELIM_RPAR block {
         // printf("For statement\n"); // for debugging
         if (strcmp($5.type, "BOOL") == 0) {
             // while (*(bool *)$5.value) {
@@ -1324,8 +1355,8 @@ function_declaration:
         } else {
             // check if parameter list has duplicate names
             Parameter *param = $4;
-            Parameter *nextParam = param->next;
             while (param != NULL) {
+                Parameter *nextParam = param->next;
                 while (nextParam != NULL) {
                     if (strcmp(param->name, nextParam->name) == 0) {
                         yyerror("Duplicate parameter name in function declaration");
@@ -1378,8 +1409,8 @@ function_declaration:
         } else {
             // check if parameter list has duplicate names
             Parameter *param = $4;
-            Parameter *nextParam = param->next;
             while (param != NULL) {
+                Parameter *nextParam = param->next;
                 while (nextParam != NULL) {
                     if (strcmp(param->name, nextParam->name) == 0) {
                         yyerror("Duplicate parameter name in function declaration");
@@ -1478,21 +1509,15 @@ function_invocation:
                     bool current_arg_type_match = false;
                     if (strcmp(arg->type, "INT") == 0 && strcmp(param->type, "int") == 0) {
                         current_arg_type_match = true;
-                    } else if ((strcmp(arg->type, "REAL") == 0 || strcmp(arg->type, "float") == 0) && (strcmp(param->type, "float") == 0 || strcmp(param->type, "double") == 0)) {
+                    } else if (strcmp(arg->type, "REAL") == 0 && (strcmp(param->type, "string") == 0 || strcmp(param->type, "double") == 0)) {
                         current_arg_type_match = true;
                     } else if (strcmp(arg->type, "BOOL") == 0 && strcmp(param->type, "bool") == 0) {
                         current_arg_type_match = true;
-                    } else if ((strcmp(arg->type, "STRING") == 0 || strcmp(arg->type, "char") == 0) && (strcmp(param->type, "string") == 0 || strcmp(param->type, "char") == 0)) {
+                    } else if (strcmp(arg->type, "STRING") == 0 && (strcmp(param->type, "string") == 0 || strcmp(param->type, "char") == 0)) {
                         current_arg_type_match = true;
                     }
-
-                    if (!current_arg_type_match &&
-                        (strcmp(param->type, "float") == 0 || strcmp(param->type, "double") == 0) &&
-                        strcmp(arg->type, "INT") == 0) {
-                            current_arg_type_match = true; // int can be converted to float/double
-                    }
-                    
                     if (!current_arg_type_match) {
+                        type_mismatch = true;
                         yyerror("Type mismatch in function invocation");
                         break; // exit the loop on type mismatch
                     }
@@ -1590,12 +1615,12 @@ int main(int argc, char **argv) {
         currentTable = NULL;
         deleteFunctionTable(functionTable);
         functionTable = NULL;
-        printf("Parsing completed successfully.\n");
+        printf("Parsing done.\n");
     } else {
         printf("Parsing failed.\n");
     }
 
     fclose(yyin);
     return 0;
-    /* 連夜趕工才發現自己根本越寫越歪，只要做syntax analysis就好，多做了很多沒用的功能，bruh */
+    /* 連夜趕工才發現自己根本越寫越歪，只要做syntax analysis就好，多做了很多沒用的功能，到最後程式變成一團spaghetti, bruh */
 }
