@@ -30,11 +30,9 @@ void insertSymbol(SymbolTable *table, const char *name, const char *type, int is
     symbol->isConst = isConst;
     symbol->isArray = isArray;
     symbol->dimensions = NULL; // default to NULL
-    symbol->arrayData = NULL; // default to NULL
 
     if (isArray) {
         symbol->dimensions = dims;
-        symbol->arrayData = data_ptr_or_value_ptr; // data_ptr_or_value_ptr is result of ceeate_md_array_data
     } else {
         if (dims)
             free_dimension_info(dims);
@@ -140,8 +138,7 @@ void deleteSymbolTable(SymbolTable *table) {
             symbol = symbol->next;
             free(temp->name);
             free(temp->type);
-            if (temp->isArray && temp->arrayData) {
-                free_md_array_data(temp->arrayData, temp->type, temp->dimensions, 0);
+            if (temp->isArray) {
                 free_dimension_info(temp->dimensions);  // free dimension itself
             } else if (!temp->isArray && (strcmp(temp->type, "string") == 0 || strcmp(temp->type, "char") == 0)) {
                 if (temp->value.stringValue) {

@@ -31,7 +31,6 @@ typedef struct Symbol {
         char *stringValue;
         // void *arrayValue;
     } value;             // value of the symbol
-    void *arrayData;   // pointer to array data
     struct Symbol *next; 
 } Symbol;
 

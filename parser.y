@@ -392,65 +392,78 @@ array_indices:
 
 arithmetic_expression:
     ID array_indices {
-        // array access
-        $$ = default_expr_error_value();
-        if (!$2) {
-            yyerror("Invalid array access indices");
+        Symbol *symbol = lookupSymbol(currentTable, $1);
+        if (strcmp(symbol->type, "int") == 0) {
+            $$.type = "INT";
+        } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+            $$.type = "REAL";
+        } else if (strcmp(symbol->type, "bool") == 0) {
+            $$.type = "BOOL";
+        } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
+            $$.type = "STRING";
         } else {
-            Symbol *symbol = lookupSymbol(currentTable, $1);
-            if (symbol == NULL) {
-                yyerror("Undefined array variable");
-            } else if (!symbol->isArray) {
-                yyerror("Variable is not an array");
-            } else if (symbol->dimensions->num_dimensions != $2->num_indices) {
-                yyerror("Incorrect number of dimensions for array");
-            } else {
-                // bounds check
-                bool bounds_ok = true;
-                for (int i = 0; i < $2->num_indices; ++i) {
-                    if ($2->indices[i] < 0 || $2->indices[i] >= symbol->dimensions->sizes[i]) {
-                        yyerror("Array index out of bounds");
-                        bounds_ok = false;
-                        break;
-                    }
-                }
-
-                if (bounds_ok) {
-                    void *element_ptr = get_md_array_element_ptr(symbol, $2);
-                    if (element_ptr) {
-                        if (strcmp(symbol->type, "int") == 0) {
-                            $$.type = "INT";
-                            $$.value = NULL;
-                            // $$.value = malloc(sizeof(int));
-                            // *(int *)$$.value = *(int *)element_ptr;
-                        } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                            $$.type = "REAL";
-                            $$.value = NULL;
-                            // $$.value = malloc(sizeof(float));
-                            // *(float *)$$.value = *(float *)element_ptr;
-                        } else if (strcmp(symbol->type, "bool") == 0) {
-                            $$.type = "BOOL";
-                            $$.value = NULL;
-                            // $$.value = malloc(sizeof(bool));
-                            // *(bool *)$$.value = *(bool *)element_ptr;
-                        } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
-                            $$.type = "STRING";
-                            $$.value = NULL;
-                            // $$.value = strdup(*(char **)element_ptr);
-                        } else {
-                            yyerror("Unsupported array type");
-                        }
-                    } else {
-                        yyerror("Failed to access array element");
-                    }
-                }
-            }
-            // clean up IndexAccessInfo
-            if ($2) {
-                free($2->indices);
-                free($2);
-            }
+            yyerror("Invalid type for array access");
         }
+        $$.value = NULL;
+        // array access
+        // $$ = default_expr_error_value();
+        // if (!$2) {
+        //     yyerror("Invalid array access indices");
+        // } else {
+        //     Symbol *symbol = lookupSymbol(currentTable, $1);
+        //     if (symbol == NULL) {
+        //         yyerror("Undefined array variable");
+        //     } else if (!symbol->isArray) {
+        //         yyerror("Variable is not an array");
+        //     } else if (symbol->dimensions->num_dimensions != $2->num_indices) {
+        //         yyerror("Incorrect number of dimensions for array");
+        //     } else {
+        //         // bounds check
+        //         bool bounds_ok = true;
+        //         for (int i = 0; i < $2->num_indices; ++i) {
+        //             if ($2->indices[i] < 0 || $2->indices[i] >= symbol->dimensions->sizes[i]) {
+        //                 yyerror("Array index out of bounds");
+        //                 bounds_ok = false;
+        //                 break;
+        //             }
+        //         }
+
+        //         if (bounds_ok) {
+        //             void *element_ptr = get_md_array_element_ptr(symbol, $2);
+        //             if (element_ptr) {
+        //                 if (strcmp(symbol->type, "int") == 0) {
+        //                     $$.type = "INT";
+        //                     $$.value = NULL;
+        //                     // $$.value = malloc(sizeof(int));
+        //                     // *(int *)$$.value = *(int *)element_ptr;
+        //                 } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
+        //                     $$.type = "REAL";
+        //                     $$.value = NULL;
+        //                     // $$.value = malloc(sizeof(float));
+        //                     // *(float *)$$.value = *(float *)element_ptr;
+        //                 } else if (strcmp(symbol->type, "bool") == 0) {
+        //                     $$.type = "BOOL";
+        //                     $$.value = NULL;
+        //                     // $$.value = malloc(sizeof(bool));
+        //                     // *(bool *)$$.value = *(bool *)element_ptr;
+        //                 } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
+        //                     $$.type = "STRING";
+        //                     $$.value = NULL;
+        //                     // $$.value = strdup(*(char **)element_ptr);
+        //                 } else {
+        //                     yyerror("Unsupported array type");
+        //                 }
+        //             } else {
+        //                 yyerror("Failed to access array element");
+        //             }
+        //         }
+        //     }
+        //     // clean up IndexAccessInfo
+        //     if ($2) {
+        //         free($2->indices);
+        //         free($2);
+        //     }
+        // }
     }
     | OP_SUB expression %prec OP_INC {
         // Unary minus

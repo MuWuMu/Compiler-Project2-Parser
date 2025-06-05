@@ -33,6 +33,4 @@ void free_md_array_data(void* array_data, const char* base_type, DimensionInfo *
 // counter helper function
 int count_initializers(struct Node* init_list);
 
-void *get_md_array_element_ptr(struct Symbol *array_symbol, struct IndexAccessInfo *acc_indices);
-
 #endif // ARRAY_UTILS_H

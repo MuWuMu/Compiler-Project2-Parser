@@ -78,7 +78,7 @@ void main () {
         // function invocation
         test_func_no_declare(); // function not declared
         e = test_func(true, false);
-        test_func2(a, b);   // type dismatch
+        test_func2(a, const_int_arr[0]);
         test_func3(1.1, 1.2);
         test_func4(c, c);
         test_func5();
@@ -99,10 +99,5 @@ void main () {
     // Loop
     while (f == 1.0)
         f++;
-
-    int i;
-
-
-    
 
 }

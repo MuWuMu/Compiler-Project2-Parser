@@ -44,47 +44,47 @@ void free_dimension_info(DimensionInfo *dims) {
     }
 }
 
-// 建立多維陣列資料的遞迴輔助函數
+// create multi-dimensional array data
 static void* create_md_array_recursive(const char* base_type, DimensionInfo *dims, int current_dim_idx) {
     if (current_dim_idx >= dims->num_dimensions) {
-        return NULL; // 如果呼叫正確，不應發生
+        return NULL; // should not reach here
     }
 
     int current_size = dims->sizes[current_dim_idx];
     if (current_dim_idx == dims->num_dimensions - 1) {
-        // 基本情況：為實際資料元素分配空間
+        // basic condition: set space for dara
         size_t element_size;
         if (strcmp(base_type, "int") == 0) element_size = sizeof(int);
         else if (strcmp(base_type, "float") == 0 || strcmp(base_type, "double") == 0) element_size = sizeof(float);
         else if (strcmp(base_type, "bool") == 0) element_size = sizeof(bool);
-        else if (strcmp(base_type, "string") == 0 || strcmp(base_type, "char") == 0) element_size = sizeof(char*); // 字串使用 char 指標陣列
+        else if (strcmp(base_type, "string") == 0 || strcmp(base_type, "char") == 0) element_size = sizeof(char*); // string use char*
         else {
-            fprintf(stderr, "不支援的陣列基礎型別: %s\n", base_type);
+            fprintf(stderr, "Not supported type: %s\n", base_type);
             return NULL;
         }
-        void* data_segment = calloc(current_size, element_size); // 使用 calloc 初始化為 0/false/NULL
+        void* data_segment = calloc(current_size, element_size); // use calloc to initialize to 0
         if (!data_segment) {
-            perror("無法為多維陣列分配資料區段");
+            perror("Cannot allocate memory for multi-dimensional array data");
             return NULL;
         }
-        // 對於 string/char 陣列，如果沒有進一步初始化，則將指標初始化為空字串
+        // for string/char array, if no additional init, then init as ""
         if (strcmp(base_type, "string") == 0 || strcmp(base_type, "char") == 0) {
             for (int i = 0; i < current_size; ++i) {
-                ((char**)data_segment)[i] = strdup(""); // 預設為空字串
+                ((char**)data_segment)[i] = strdup(""); // default ""
             }
         }
         return data_segment;
     } else {
-        // 遞迴步驟：為指向下一個維度的指標分配空間
+        // recursive: set space for next pointed dimension
         void** pointers_segment = (void**)calloc(current_size, sizeof(void*));
         if (!pointers_segment) {
-            perror("無法為多維陣列分配指標區段");
+            perror("Cannot allocate memory for multi-dimensional array pointers");
             return NULL;
         }
         for (int i = 0; i < current_size; ++i) {
             pointers_segment[i] = create_md_array_recursive(base_type, dims, current_dim_idx + 1);
             if (!pointers_segment[i]) {
-                // 如果其中一個失敗，清理先前分配的區段
+                // if one of the recursive call fails, free all previous allocations
                 for (int j = 0; j < i; ++j) {
                     free_md_array_data(pointers_segment[j], base_type, dims, current_dim_idx + 1);
                 }
@@ -101,7 +101,7 @@ void* create_md_array_data(const char* base_type, DimensionInfo *dims) {
     return create_md_array_recursive(base_type, dims, 0);
 }
 
-// 初始化多維陣列資料的遞迴輔助函數
+// helper function to initialize multi-dimensional array data
 static void initialize_md_array_recursive(void* current_segment, const char* base_type, DimensionInfo *dims, int current_dim_idx, Node** current_initializer) {
     if (!current_segment || current_dim_idx >= dims->num_dimensions) {
         return;
@@ -109,9 +109,9 @@ static void initialize_md_array_recursive(void* current_segment, const char* bas
 
     int current_size = dims->sizes[current_dim_idx];
 
-    if (current_dim_idx == dims->num_dimensions - 1) { // 最內層維度 (實際資料)
+    if (current_dim_idx == dims->num_dimensions - 1) { // real data
         for (int i = 0; i < current_size; ++i) {
-            if (*current_initializer && (*current_initializer)->value) { // 如果有初始化項目
+            if (*current_initializer && (*current_initializer)->value) { // fi there's an initializer
                 if (strcmp(base_type, "int") == 0) {
                     ((int*)current_segment)[i] = *(int*)((*current_initializer)->value);
                 } else if (strcmp(base_type, "float") == 0 || strcmp(base_type, "double") == 0) {
@@ -119,17 +119,15 @@ static void initialize_md_array_recursive(void* current_segment, const char* bas
                 } else if (strcmp(base_type, "bool") == 0) {
                     ((bool*)current_segment)[i] = *(bool*)((*current_initializer)->value);
                 } else if (strcmp(base_type, "string") == 0 || strcmp(base_type, "char") == 0) {
-                    free(((char**)current_segment)[i]); // 釋放預設的空字串
+                    free(((char**)current_segment)[i]); // free original ""
                     ((char**)current_segment)[i] = strdup((char*)((*current_initializer)->value));
                 }
-                *current_initializer = (*current_initializer)->next; // 移動到下一個初始化項目
+                *current_initializer = (*current_initializer)->next; // move to next initializer
             } else {
-                // 預設初始化已在 create_md_array_recursive 中由 calloc 或 strdup("") 處理
-                // 對於 string/char，如果沒有初始化項目，則保持 strdup("")。
-                // 對於數字/布林值，則保持 calloc 設定的 0/false。
+                // keep default value
             }
         }
-    } else { // 指標維度
+    } else { // pointer dimension
         for (int i = 0; i < current_size; ++i) {
             initialize_md_array_recursive(((void**)current_segment)[i], base_type, dims, current_dim_idx + 1, current_initializer);
         }
@@ -139,7 +137,7 @@ static void initialize_md_array_recursive(void* current_segment, const char* bas
 
 void initialize_md_array_data(void* array_data, const char* base_type, DimensionInfo *dims, Node* initializer_list) {
     if (!array_data || !dims) return;
-    Node* current_init = initializer_list; // 從初始化列表的頭部開始
+    Node* current_init = initializer_list; // init list head
     initialize_md_array_recursive(array_data, base_type, dims, 0, &current_init);
 }
 
@@ -150,18 +148,18 @@ void free_md_array_data(void* array_segment, const char* base_type, DimensionInf
     }
 
     int current_size = dims->sizes[current_dim_idx];
-    if (current_dim_idx == dims->num_dimensions - 1) { // 最內層維度
+    if (current_dim_idx == dims->num_dimensions - 1) {
         if (strcmp(base_type, "string") == 0 || strcmp(base_type, "char") == 0) {
             for (int i = 0; i < current_size; ++i) {
-                free(((char**)array_segment)[i]); // 釋放每個字串
+                free(((char**)array_segment)[i]); // free each string
             }
         }
-        free(array_segment); // 釋放資料區段
-    } else { // 指標維度
+        free(array_segment); // free segment
+    } else { // pointer dimension
         for (int i = 0; i < current_size; ++i) {
             free_md_array_data(((void**)array_segment)[i], base_type, dims, current_dim_idx + 1);
         }
-        free(array_segment); // 釋放指標區段
+        free(array_segment); // free pointer segment
     }
 }
 
@@ -176,40 +174,3 @@ int count_initializers(Node* init_list) {
 }
 
 
-void* get_md_array_element_ptr(Symbol *array_symbol, IndexAccessInfo *acc_indices) {
-    if (!array_symbol || !array_symbol->isArray || !array_symbol->dimensions || !array_symbol->arrayData || !acc_indices) {
-        return NULL; // invalid input
-    }
-
-    if (array_symbol->dimensions->num_dimensions != acc_indices->num_indices) {
-        return NULL; // dimension mismatch
-    }
-
-    void *current_ptr = array_symbol->arrayData;
-    for (int i = 0; i < acc_indices->num_indices; ++i) {
-        int index_val = acc_indices->indices[i];
-        if (index_val < 0 || index_val >= array_symbol->dimensions->sizes[i]) {
-            return NULL; // index out of bounds
-        }
-
-        if (i < acc_indices->num_indices - 1) { // not the last dimension, current_ptr points to an array of pointers
-            if (!current_ptr)
-                return NULL; // invalid pointer
-            current_ptr = ((void**)current_ptr)[index_val]; // move to the next level
-        } else {
-            if (!current_ptr)
-                return NULL; // invalid pointer
-            unsigned int element_size;
-            if (strcmp(array_symbol->type, "int") == 0) element_size = sizeof(int);
-            else if (strcmp(array_symbol->type, "float") == 0 || strcmp(array_symbol->type, "double") == 0) element_size = sizeof(float);
-            else if (strcmp(array_symbol->type, "bool") == 0) element_size = sizeof(bool);
-            else if (strcmp(array_symbol->type, "string") == 0 || strcmp(array_symbol->type, "char") == 0) element_size = sizeof(char*); // 字串使用 char 指標陣列
-            else 
-                return NULL; // unsupported type
-            // calculate the address of the element within the current data segment
-            current_ptr = (char*)current_ptr + index_val * element_size;
-            return current_ptr; // return the address of the element
-        }
-    }
-    return NULL; // should not reach here
-}
