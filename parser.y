@@ -108,8 +108,23 @@ declaration:
         while (current != NULL) {
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
+            } else if (current->type != NULL) {
+                switch (current->type) {
+                    case "INT":
+                        if ($1 != "int")
+                            yyerror("Type mismatch in declaration");
+                    case "REAL":
+                        if ($1 != "float" && $1 != "double")
+                            yyerror("Type mismatch in declaration");
+                    case "BOOL":
+                        if ($1 != "bool")
+                            yyerror("Type mismatch in declaration");
+                    case "STRING":
+                        if ($1 != "string" && $1 != "char")
+                            yyerror("Type mismatch in declaration");
+                }
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, 0, NULL, current->value);
+                insertSymbol(currentTable, current->name, $1, 0, 0, NULL, NULL/*current->value*/);
             }
             current = current->next;
         }
@@ -122,10 +137,25 @@ declaration:
         while (current != NULL) {
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
+            } else if (current->type != NULL) {
+                switch (current->type) {
+                    case "INT":
+                        if ($2 != "int")
+                            yyerror("Type mismatch in declaration");
+                    case "REAL":
+                        if ($2 != "float" && $2 != "double")
+                            yyerror("Type mismatch in declaration");
+                    case "BOOL":
+                        if ($2 != "bool")
+                            yyerror("Type mismatch in declaration");
+                    case "STRING":
+                        if ($2 != "string" && $2 != "char")
+                            yyerror("Type mismatch in declaration");
+                }
             } else if (current->value == NULL) {
                 yyerror("Const variable must be initialized");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, 0, NULL, current->value); // set as const
+                insertSymbol(currentTable, current->name, $2, 1, 0, NULL, NULL/*current->value*/); // set as const
                 // printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
@@ -163,6 +193,7 @@ declarator_list:
         // single declaration without initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
+        $$->type = NULL; // no type yet
         $$->next = NULL;
         $$->value = NULL; // no initialization
     }
@@ -170,6 +201,7 @@ declarator_list:
         // single declaration with initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
+        $$->type = $3.type;
         $$->next = NULL;
         $$->value = $3.value; // initialization value
     }
@@ -177,6 +209,7 @@ declarator_list:
         // multi declaration without initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
+        $$->type = $3.type;
         $$->next = $3;
         $$->value = NULL;
     }
@@ -184,6 +217,7 @@ declarator_list:
         // multi declaration with initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
+        $$->type = $3.type;
         $$->next = $5;
         $$->value = $3.value;
     }

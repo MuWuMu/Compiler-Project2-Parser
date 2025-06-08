@@ -12,6 +12,7 @@
 
 typedef struct Node {
     char *name;               // variable name
+    char *type;               // variable type
     struct Node *next;       // pointer to next
     void *value;             // initial value if any
 } Node;
